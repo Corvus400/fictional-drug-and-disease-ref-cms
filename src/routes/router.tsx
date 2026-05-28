@@ -223,6 +223,7 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
       </div>
       <form
         className="filter-panel"
+        aria-labelledby="filter-panel-title"
         onSubmit={(event) => {
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
@@ -272,164 +273,183 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
           });
         }}
       >
-        <div className="filter-panel-title">
-          <Search aria-hidden="true" size={17} />
-          {t("search")}
+        <div className="filter-panel-header">
+          <div className="filter-panel-title" id="filter-panel-title">
+            <Search aria-hidden="true" size={17} />
+            {t("search")}
+          </div>
         </div>
-        <label className="field compact">
-          <span>{t("search")}</span>
-          <input className="input" autoComplete="off" defaultValue={search.q ?? ""} name="q" />
-        </label>
-        {kind === "drugs" ? (
-          <>
-            <label className="field compact">
-              <span>{t("dosageForm")}</span>
-              <select className="input" name="dosageForm" defaultValue={search.dosageForm ?? ""}>
-                <option value="">{t("all")}</option>
-                {dosageForms.map((option) => (
-                  <option key={option} value={option}>
-                    {formatOption(option)}
-                  </option>
-                ))}
-              </select>
+        <div className="filter-panel-body">
+          <div className="filter-group filter-group-primary">
+            <label className="field filter-field">
+              <span>{t("search")}</span>
+              <input className="input" autoComplete="off" defaultValue={search.q ?? ""} name="q" />
             </label>
-            <label className="field compact">
-              <span>{t("atcCode")}</span>
-              <input
-                className="input"
-                autoComplete="off"
-                defaultValue={search.atcCode ?? ""}
-                name="atcCode"
-                spellCheck={false}
-              />
-            </label>
-            <FilterSelect
-              name="regulatoryClass"
-              label={t("regulatoryClass")}
-              value={search.regulatoryClass}
-              options={regulatoryClasses}
-            />
-            <FilterSelect
-              name="route"
-              label={t("routeOfAdministration")}
-              value={search.route}
-              options={routeOfAdministration}
-            />
-            <label className="field compact">
-              <span>{t("seriousAdverseReactions")}</span>
-              <input
-                className="input"
-                autoComplete="off"
-                defaultValue={search.adverseReactionKeyword ?? ""}
-                name="adverseReactionKeyword"
-              />
-            </label>
-            <FilterSelect
-              name="precautionCategory"
-              label={t("precautionsForSpecificPopulations")}
-              value={search.precautionCategory}
-              options={precautionCategories}
-            />
-          </>
-        ) : (
-          <>
-            <FilterSelect
-              name="icd10Chapter"
-              label={t("icd10Chapter")}
-              value={search.icd10Chapter}
-              options={icd10Chapters}
-            />
-            <FilterSelect
-              name="department"
-              label={t("medicalDepartment")}
-              value={search.department}
-              options={medicalDepartments}
-            />
-            <FilterSelect
-              name="chronicity"
-              label={t("chronicity")}
-              value={search.chronicity}
-              options={chronicities}
-            />
-            <FilterSelect
-              name="infectious"
-              label={t("infectious")}
-              value={search.infectious}
-              options={["true", "false"]}
-            />
-            <label className="field compact">
-              <span>{t("symptoms")}</span>
-              <input
-                className="input"
-                autoComplete="off"
-                defaultValue={search.symptomKeyword ?? ""}
-                name="symptomKeyword"
-              />
-            </label>
-            <FilterSelect
-              name="onsetPattern"
-              label={t("onsetPattern")}
-              value={search.onsetPattern}
-              options={onsetPatternOptions}
-            />
-            <FilterSelect
-              name="examCategory"
-              label={t("examCategory")}
-              value={search.examCategory}
-              options={examCategoryOptions}
-            />
-            <FilterSelect
-              name="hasPharmacologicalTreatment"
-              label={t("pharmacologicalTreatments")}
-              value={search.hasPharmacologicalTreatment}
-              options={["true", "false"]}
-            />
-            <FilterSelect
-              name="hasSeverityGrading"
-              label={t("severityGrading")}
-              value={search.hasSeverityGrading}
-              options={["true", "false"]}
-            />
-          </>
-        )}
-        <FilterSelect
-          name="keywordMatch"
-          label={t("keywordMatch")}
-          value={search.keywordMatch}
-          options={["partial", "prefix"]}
-        />
-        <FilterSelect
-          name="keywordTarget"
-          label={t("keywordTarget")}
-          value={search.keywordTarget}
-          options={
-            kind === "drugs"
-              ? ["generic", "brand", "both", "all"]
-              : ["name", "name_english", "synonyms", "all"]
-          }
-        />
-        <label className="field compact">
-          <span>{t("sort")}</span>
-          <select className="input" name="sort" defaultValue={search.sort ?? ""}>
-            <option value="">{t("sortDefault")}</option>
-            <option value="-revised_at">{t("sortUpdatedAt")}</option>
+            {kind === "drugs" ? (
+              <label className="field filter-field filter-field-code">
+                <span>{t("atcCode")}</span>
+                <input
+                  className="input"
+                  autoComplete="off"
+                  defaultValue={search.atcCode ?? ""}
+                  name="atcCode"
+                  spellCheck={false}
+                />
+              </label>
+            ) : (
+              <label className="field filter-field">
+                <span>{t("symptoms")}</span>
+                <input
+                  className="input"
+                  autoComplete="off"
+                  defaultValue={search.symptomKeyword ?? ""}
+                  name="symptomKeyword"
+                />
+              </label>
+            )}
+          </div>
+          <div className="filter-group filter-group-resource">
             {kind === "drugs" ? (
               <>
-                <option value="brand_name_kana">{t("sortBrandName")}</option>
-                <option value="atc_code">{t("atcCode")}</option>
-                <option value="therapeutic_category_name">{t("therapeuticCategoryName")}</option>
+                <label className="field filter-field">
+                  <span>{t("dosageForm")}</span>
+                  <select
+                    className="input"
+                    name="dosageForm"
+                    defaultValue={search.dosageForm ?? ""}
+                  >
+                    <option value="">{t("all")}</option>
+                    {dosageForms.map((option) => (
+                      <option key={option} value={option}>
+                        {formatOption(option)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <FilterSelect
+                  name="regulatoryClass"
+                  label={t("regulatoryClass")}
+                  value={search.regulatoryClass}
+                  options={regulatoryClasses}
+                />
+                <FilterSelect
+                  name="route"
+                  label={t("routeOfAdministration")}
+                  value={search.route}
+                  options={routeOfAdministration}
+                />
+                <label className="field filter-field">
+                  <span>{t("seriousAdverseReactions")}</span>
+                  <input
+                    className="input"
+                    autoComplete="off"
+                    defaultValue={search.adverseReactionKeyword ?? ""}
+                    name="adverseReactionKeyword"
+                  />
+                </label>
+                <FilterSelect
+                  name="precautionCategory"
+                  label={t("precautionsForSpecificPopulations")}
+                  value={search.precautionCategory}
+                  options={precautionCategories}
+                />
               </>
             ) : (
               <>
-                <option value="name_kana">{t("sortName")}</option>
-                <option value="icd10_chapter">{t("icd10Chapter")}</option>
+                <FilterSelect
+                  name="icd10Chapter"
+                  label={t("icd10Chapter")}
+                  value={search.icd10Chapter}
+                  options={icd10Chapters}
+                />
+                <FilterSelect
+                  name="department"
+                  label={t("medicalDepartment")}
+                  value={search.department}
+                  options={medicalDepartments}
+                />
+                <FilterSelect
+                  name="chronicity"
+                  label={t("chronicity")}
+                  value={search.chronicity}
+                  options={chronicities}
+                />
+                <FilterSelect
+                  name="infectious"
+                  label={t("infectious")}
+                  value={search.infectious}
+                  options={["true", "false"]}
+                />
+                <FilterSelect
+                  name="onsetPattern"
+                  label={t("onsetPattern")}
+                  value={search.onsetPattern}
+                  options={onsetPatternOptions}
+                />
+                <FilterSelect
+                  name="examCategory"
+                  label={t("examCategory")}
+                  value={search.examCategory}
+                  options={examCategoryOptions}
+                />
+                <FilterSelect
+                  name="hasPharmacologicalTreatment"
+                  label={t("pharmacologicalTreatments")}
+                  value={search.hasPharmacologicalTreatment}
+                  options={["true", "false"]}
+                />
+                <FilterSelect
+                  name="hasSeverityGrading"
+                  label={t("severityGrading")}
+                  value={search.hasSeverityGrading}
+                  options={["true", "false"]}
+                />
               </>
             )}
-          </select>
-        </label>
-        <button className="button button-secondary" type="submit">
-          {t("search")}
-        </button>
+          </div>
+          <div className="filter-group filter-group-meta">
+            <FilterSelect
+              name="keywordMatch"
+              label={t("keywordMatch")}
+              value={search.keywordMatch}
+              options={["partial", "prefix"]}
+            />
+            <FilterSelect
+              name="keywordTarget"
+              label={t("keywordTarget")}
+              value={search.keywordTarget}
+              options={
+                kind === "drugs"
+                  ? ["generic", "brand", "both", "all"]
+                  : ["name", "name_english", "synonyms", "all"]
+              }
+            />
+            <label className="field filter-field">
+              <span>{t("sort")}</span>
+              <select className="input" name="sort" defaultValue={search.sort ?? ""}>
+                <option value="">{t("sortDefault")}</option>
+                <option value="-revised_at">{t("sortUpdatedAt")}</option>
+                {kind === "drugs" ? (
+                  <>
+                    <option value="brand_name_kana">{t("sortBrandName")}</option>
+                    <option value="atc_code">{t("atcCode")}</option>
+                    <option value="therapeutic_category_name">
+                      {t("therapeuticCategoryName")}
+                    </option>
+                  </>
+                ) : (
+                  <>
+                    <option value="name_kana">{t("sortName")}</option>
+                    <option value="icd10_chapter">{t("icd10Chapter")}</option>
+                  </>
+                )}
+              </select>
+            </label>
+            <button className="button button-secondary filter-submit" type="submit">
+              {t("search")}
+            </button>
+          </div>
+        </div>
       </form>
       {list.isLoading ? <p>{t("loading")}</p> : null}
       {list.error ? <ErrorNotice error={list.error} /> : null}
@@ -556,6 +576,7 @@ function ResourceSwitcher() {
   return (
     <nav className="resource-switcher" aria-label={t("resourceNavigation")}>
       <Link
+        activeOptions={{ includeSearch: false }}
         activeProps={{ className: "switch-link active" }}
         className="switch-link"
         to="/drugs"
@@ -564,6 +585,7 @@ function ResourceSwitcher() {
         {t("drugs")}
       </Link>
       <Link
+        activeOptions={{ includeSearch: false }}
         activeProps={{ className: "switch-link active" }}
         className="switch-link"
         to="/diseases"
@@ -592,7 +614,7 @@ function FilterSelect({
   options: readonly string[];
 }) {
   return (
-    <label className="field compact">
+    <label className="field filter-field">
       <span>{label}</span>
       <select className="input" name={name} defaultValue={value ?? ""}>
         <option value="">{t("all")}</option>

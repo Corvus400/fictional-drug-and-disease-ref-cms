@@ -170,6 +170,32 @@ describe("CMS mutation flows", () => {
     expect(window.location.search).toContain("atcCode=B00");
   });
 
+  it("renders the drug filters as a grouped panel with sorting outside the header", async () => {
+    window.history.pushState(null, "", "/drugs");
+
+    render(<App />);
+
+    const filterPanel = await screen.findByRole("form", { name: "検索" });
+    expect(within(filterPanel).getByLabelText("検索")).toBeInTheDocument();
+    expect(within(filterPanel).getByLabelText("剤形")).toBeInTheDocument();
+    expect(within(filterPanel).getByLabelText("ATC コード")).toBeInTheDocument();
+    expect(within(filterPanel).getByLabelText("並び順")).toBeInTheDocument();
+
+    const panelHeader = filterPanel.querySelector(".filter-panel-header");
+    const panelBody = filterPanel.querySelector(".filter-panel-body");
+    expect(panelHeader).not.toContainElement(within(filterPanel).getByLabelText("並び順"));
+    expect(panelBody?.querySelectorAll(".filter-group")).toHaveLength(3);
+  });
+
+  it("keeps the resource switcher active when list search params change", async () => {
+    window.history.pushState(null, "", "/drugs?page=2&pageSize=20&sort=brand_name_kana");
+
+    render(<App />);
+
+    const navigation = await screen.findByRole("navigation", { name: "リソース" });
+    expect(within(navigation).getByRole("link", { name: "医薬品" })).toHaveClass("active");
+  });
+
   it("keeps sort in the route search state and forwards it to the API query", async () => {
     server.use(
       http.get("http://127.0.0.1:19090/v1/drugs", ({ request }) => {

@@ -503,8 +503,17 @@ th:first-child,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .section-trigger-icon {
+  .section-trigger-icon,
+  .button,
+  .icon-button,
+  .file-input {
     transition: none;
+  }
+
+  .button:hover,
+  .icon-button:hover,
+  .file-input:hover {
+    transform: none;
   }
 }
 
@@ -637,15 +646,21 @@ th:first-child,
 }
 
 .filter-panel {
-  align-items: end;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.filter-panel-header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px;
+  justify-content: space-between;
+  padding-bottom: 12px;
 }
 
 .filter-panel-title {
@@ -654,8 +669,85 @@ th:first-child,
   display: inline-flex;
   gap: 6px;
   font-weight: 700;
-  min-height: 42px;
-  min-width: 88px;
+}
+
+.filter-panel-body {
+  display: grid;
+  gap: 16px;
+}
+
+.filter-group {
+  display: grid;
+  gap: 12px;
+}
+
+.filter-group-primary {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.filter-group-primary .filter-field:first-child {
+  grid-column: span 3;
+}
+
+.filter-group-primary .filter-field:not(:first-child) {
+  grid-column: span 2;
+}
+
+.filter-group-resource {
+  border-top: 1px solid var(--border);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding-top: 16px;
+}
+
+.filter-group-meta {
+  align-items: end;
+  border-top: 1px solid var(--border);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding-top: 16px;
+}
+
+.filter-field {
+  align-self: stretch;
+  max-width: none;
+}
+
+.filter-field > span {
+  align-items: end;
+  display: flex;
+  min-height: 2.6em;
+  overflow-wrap: anywhere;
+}
+
+.filter-field-code {
+  max-width: none;
+}
+
+.filter-submit {
+  align-self: end;
+  grid-column: 5;
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .filter-group,
+  .filter-group-primary,
+  .filter-group-resource,
+  .filter-group-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-group-primary .filter-field:first-child,
+  .filter-group-primary .filter-field:not(:first-child) {
+    grid-column: auto;
+  }
+
+  .filter-field-code,
+  .filter-submit {
+    grid-column: auto;
+    max-width: none;
+    width: 100%;
+  }
 }
 
 .section-panel,
