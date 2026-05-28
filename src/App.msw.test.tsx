@@ -75,6 +75,9 @@ const drugFixture = {
 
 const server = setupServer(
   http.post("http://127.0.0.1:19090/v1/admin/token", () => HttpResponse.json({ token: "token" })),
+  http.get("http://127.0.0.1:19090/v1/drugs", () =>
+    HttpResponse.json({ items: [], page: 1, pageSize: 20, totalPages: 1, totalCount: 0 }),
+  ),
   http.get("http://127.0.0.1:19090/v1/drugs/drug_0001", () =>
     HttpResponse.json(drugFixture, { headers: { ETag: '"v1"' } }),
   ),
@@ -122,5 +125,31 @@ describe("CMS mutation flows", () => {
       "サーバ側で更新されました。最新を取得しました。差分を確認して再編集してください。",
     );
     expect(screen.getByDisplayValue("競合した販売名")).toBeInTheDocument();
+  });
+
+  it("renders drug detail as structured sections instead of raw JSON", async () => {
+    window.history.pushState(null, "", "/drugs/drug_0001");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "テスト販売名" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "基本情報" })).toBeInTheDocument();
+    expect(screen.getByText("販売名")).toBeInTheDocument();
+    expect(screen.getAllByText("テスト販売名").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/"brandName"/)).not.toBeInTheDocument();
+  });
+
+  it("keeps drug list filters in the route search state", async () => {
+    const user = userEvent.setup();
+    window.history.pushState(null, "", "/drugs");
+
+    render(<App />);
+
+    await user.selectOptions(await screen.findByLabelText("剤形"), "injection_form");
+    await user.type(screen.getByLabelText("ATC コード"), "B00");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+
+    expect(window.location.search).toContain("dosageForm=injection_form");
+    expect(window.location.search).toContain("atcCode=B00");
   });
 });

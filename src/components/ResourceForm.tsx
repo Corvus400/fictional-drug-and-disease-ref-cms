@@ -23,6 +23,7 @@ import { formatOption, type MessageKey, t } from "@/lib/i18n/messages";
 import { ErrorNotice } from "./ErrorNotice";
 import { FieldArrayEditor } from "./FieldArrayEditor";
 import { ReferencePicker } from "./ReferencePicker";
+import { AccordionContent, AccordionItem, AccordionRoot, AccordionTrigger } from "./ui/accordion";
 
 type ResourceFormProps = {
   kind: ResourceKind;
@@ -33,6 +34,16 @@ type ResourceFormProps = {
 
 type FormValue = DrugRequest | DiseaseRequest;
 type FormRecord = Record<string, unknown>;
+
+const drugSectionKeys = [
+  "basicInfo",
+  "drugCompositionDosage",
+  "drugSafety",
+  "drugSupplement",
+  "relatedResources",
+] as const;
+
+const diseaseSectionKeys = ["basicInfo", "diseaseInfo", "relatedResources"] as const;
 
 export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceFormProps) {
   const schema = kind === "drugs" ? drugRequestSchema : diseaseRequestSchema;
@@ -93,11 +104,17 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
             {t("unsaved")}
           </p>
         ) : null}
-        {kind === "drugs" ? (
-          <DrugFields selfId={initialValue?.id} />
-        ) : (
-          <DiseaseFields selfId={initialValue?.id} />
-        )}
+        <AccordionRoot
+          className="form-grid"
+          type="multiple"
+          defaultValue={kind === "drugs" ? [...drugSectionKeys] : [...diseaseSectionKeys]}
+        >
+          {kind === "drugs" ? (
+            <DrugFields selfId={initialValue?.id} />
+          ) : (
+            <DiseaseFields selfId={initialValue?.id} />
+          )}
+        </AccordionRoot>
         {save.error ? <ErrorNotice error={save.error} /> : null}
         <div className="button-row sticky-actions">
           <button className="button button-primary" type="submit" disabled={save.isPending}>
@@ -690,10 +707,12 @@ function TreatmentFields({ needsAcuteProtocol }: { needsAcuteProtocol: boolean }
 
 function Section({ titleKey, children }: { titleKey: MessageKey; children: React.ReactNode }) {
   return (
-    <section className="section-panel">
-      <h2>{t(titleKey)}</h2>
-      <div className="field-grid">{children}</div>
-    </section>
+    <AccordionItem value={titleKey}>
+      <AccordionTrigger>{t(titleKey)}</AccordionTrigger>
+      <AccordionContent>
+        <div className="field-grid">{children}</div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
@@ -713,6 +732,8 @@ function TextField({ name, labelKey, required = false, type = "text" }: FieldPro
       <input
         type={type}
         className="input"
+        autoComplete="off"
+        spellCheck={isCodeField(name) ? false : undefined}
         {...register(name, registerOptions)}
         aria-invalid={error === undefined ? undefined : true}
       />
@@ -733,7 +754,7 @@ function TextAreaField({ name, labelKey, required = false }: FieldProps) {
       <span>
         {label} <span className="field-hint">{required ? t("required") : t("optional")}</span>
       </span>
-      <textarea className="input textarea" {...register(name)} />
+      <textarea className="input textarea" autoComplete="off" {...register(name)} />
       <FieldError name={name} />
     </label>
   );
@@ -747,7 +768,7 @@ function SelectField({ name, labelKey, options }: FieldProps & { options: readon
       <span>
         {label} <span className="field-hint">{t("required")}</span>
       </span>
-      <select className="input" {...register(name)}>
+      <select className="input" autoComplete="off" {...register(name)}>
         {options.map((option) => (
           <option key={option} value={option}>
             {formatOption(option)}
@@ -771,7 +792,7 @@ function MultiSelectField({
       <span>
         {label} <span className="field-hint">{t("required")}</span>
       </span>
-      <select className="input multi" multiple {...register(name)}>
+      <select className="input multi" multiple autoComplete="off" {...register(name)}>
         {options.map((option) => (
           <option key={option} value={option}>
             {formatOption(option)}
@@ -781,6 +802,10 @@ function MultiSelectField({
       <FieldError name={name} />
     </label>
   );
+}
+
+function isCodeField(name: string): boolean {
+  return /(^|\.)(id|atcCode|yjCode|identificationCode)$/i.test(name);
 }
 
 function CheckboxField({ name, labelKey }: FieldProps) {

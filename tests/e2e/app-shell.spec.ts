@@ -93,6 +93,7 @@ test("renders the local CMS shell and resource navigation", async ({ page }) => 
     page.getByRole("navigation", { name: "リソース" }).getByRole("link", { name: "疾患" }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "医薬品一覧" })).toBeVisible();
+  await expect(page).toHaveScreenshot("cms-drug-list-desktop.png", { fullPage: true });
 });
 
 test("renders structured drug editor controls instead of JSON textareas", async ({ page }) => {
@@ -121,4 +122,5 @@ test("renders structured drug editor controls instead of JSON textareas", async 
   await expect(page.getByLabel("剤形 必須").locator("option:checked")).toHaveText("錠剤");
   await expect(page.getByRole("button", { name: "添加物追加" })).toBeVisible();
   await expect(page.getByText("JSON")).toHaveCount(0);
+  await expect(page).toHaveScreenshot("cms-drug-editor-desktop.png", { fullPage: true });
 });

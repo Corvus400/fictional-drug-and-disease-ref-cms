@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { installGlobalErrorCapture } from "./lib/errors/global";
 import "./styles.css";
 
 const rootElement = document.getElementById("root");
@@ -14,3 +15,5 @@ createRoot(rootElement).render(
     <App />
   </StrictMode>,
 );
+
+installGlobalErrorCapture();

@@ -20,20 +20,20 @@ export type ApiValue<T> = {
 
 export async function apiFetch<T>(options: ApiFetchOptions<T>): Promise<Result<ApiValue<T>>> {
   const config = getPublicConfig();
-  const token = getAccessToken() ?? (await mintToken());
   const headers = new Headers(options.headers);
-
-  if (token !== undefined) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  if (options.body !== undefined && !(options.body instanceof FormData)) {
-    headers.set("Content-Type", headers.get("Content-Type") ?? "application/json");
-  }
 
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), config.apiTimeoutMs);
 
   try {
+    const token = getAccessToken() ?? (await mintToken());
+    if (token !== undefined) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+    if (options.body !== undefined && !(options.body instanceof FormData)) {
+      headers.set("Content-Type", headers.get("Content-Type") ?? "application/json");
+    }
+
     const response = await fetch(`${config.apiBaseUrl}${options.path}`, {
       method: options.method ?? "GET",
       headers,

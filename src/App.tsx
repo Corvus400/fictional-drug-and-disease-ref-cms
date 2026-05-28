@@ -1,5 +1,10 @@
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppRouter } from "./routes/router";
 
 export function App() {
-  return <AppRouter />;
+  return (
+    <AppErrorBoundary>
+      <AppRouter />
+    </AppErrorBoundary>
+  );
 }

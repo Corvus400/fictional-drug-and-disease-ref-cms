@@ -18,8 +18,14 @@ import { ErrorNotice } from "@/components/ErrorNotice";
 import { ImageUploader } from "@/components/ImageUploader";
 import { ResourceForm } from "@/components/ResourceForm";
 import { useDeleteResource, useResourceDetail, useResourceList } from "@/lib/api/resources";
-import type { ResourceKind } from "@/lib/api/schema";
-import { t } from "@/lib/i18n/messages";
+import {
+  type Disease,
+  type Drug,
+  dosageForms,
+  icd10Chapters,
+  type ResourceKind,
+} from "@/lib/api/schema";
+import { formatOption, t } from "@/lib/i18n/messages";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -137,6 +143,9 @@ export function AppRouter() {
 function RootLayout() {
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        {t("skipToMain")}
+      </a>
       <aside className="sidebar">
         <p className="eyebrow">{t("localAdmin")}</p>
         <Link className="brand" to="/drugs" search={defaultSearch}>
@@ -161,7 +170,7 @@ function RootLayout() {
           </Link>
         </nav>
       </aside>
-      <main className="main-pane">
+      <main className="main-pane" id="main-content">
         <Outlet />
       </main>
     </div>
@@ -199,6 +208,11 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
             search: (previous) => ({
               ...previous,
               q: String(formData.get("q") ?? ""),
+              dosageForm:
+                kind === "drugs" ? emptyToUndefined(formData.get("dosageForm")) : undefined,
+              atcCode: kind === "drugs" ? emptyToUndefined(formData.get("atcCode")) : undefined,
+              icd10Chapter:
+                kind === "diseases" ? emptyToUndefined(formData.get("icd10Chapter")) : undefined,
               page: 1,
             }),
           });
@@ -206,8 +220,45 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
       >
         <label className="field compact">
           <span>{t("search")}</span>
-          <input className="input" defaultValue={search.q ?? ""} name="q" />
+          <input className="input" autoComplete="off" defaultValue={search.q ?? ""} name="q" />
         </label>
+        {kind === "drugs" ? (
+          <>
+            <label className="field compact">
+              <span>{t("dosageForm")}</span>
+              <select className="input" name="dosageForm" defaultValue={search.dosageForm ?? ""}>
+                <option value="">{t("all")}</option>
+                {dosageForms.map((option) => (
+                  <option key={option} value={option}>
+                    {formatOption(option)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field compact">
+              <span>{t("atcCode")}</span>
+              <input
+                className="input"
+                autoComplete="off"
+                defaultValue={search.atcCode ?? ""}
+                name="atcCode"
+                spellCheck={false}
+              />
+            </label>
+          </>
+        ) : (
+          <label className="field compact">
+            <span>{t("icd10Chapter")}</span>
+            <select className="input" name="icd10Chapter" defaultValue={search.icd10Chapter ?? ""}>
+              <option value="">{t("all")}</option>
+              {icd10Chapters.map((option) => (
+                <option key={option} value={option}>
+                  {formatOption(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button className="button button-secondary" type="submit">
           {t("search")}
         </button>
@@ -246,10 +297,44 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
             </table>
           </div>
           {list.data.items.length === 0 ? <p>{t("noItems")}</p> : null}
+          <nav className="pagination" aria-label={t("page")}>
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={search.page <= 1}
+              onClick={() =>
+                navigate({
+                  search: (previous) => ({ ...previous, page: Math.max(1, search.page - 1) }),
+                })
+              }
+            >
+              {t("previousPage")}
+            </button>
+            <span className="tabular">
+              {t("page")}: {search.page} / {list.data.totalPages}
+            </span>
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={search.page >= list.data.totalPages}
+              onClick={() =>
+                navigate({
+                  search: (previous) => ({ ...previous, page: search.page + 1 }),
+                })
+              }
+            >
+              {t("nextPage")}
+            </button>
+          </nav>
         </>
       ) : null}
     </section>
   );
+}
+
+function emptyToUndefined(value: FormDataEntryValue | null): string | undefined {
+  const text = String(value ?? "");
+  return text === "" ? undefined : text;
 }
 
 function ResourceDetail({ kind }: { kind: ResourceKind }) {
@@ -301,8 +386,11 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
         />
       ) : null}
       <section className="section-panel">
-        <h2>{t("detail")}</h2>
-        <pre className="json-view">{JSON.stringify(data, null, 2)}</pre>
+        {kind === "drugs" ? (
+          <DrugDetailSections data={data as Drug} />
+        ) : (
+          <DiseaseDetailSections data={data as Disease} />
+        )}
       </section>
       <ConfirmDialog
         open={confirming}
@@ -319,6 +407,128 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
       {remove.error ? <ErrorNotice error={remove.error} /> : null}
     </section>
   );
+}
+
+function DrugDetailSections({ data }: { data: Drug }) {
+  return (
+    <div className="detail-sections">
+      <DetailSection title={t("basicInfo")}>
+        <DetailItem label={t("brandName")} value={data.brandName} />
+        <DetailItem label={t("genericName")} value={data.genericName} />
+        <DetailItem label={t("brandNameKana")} value={data.brandNameKana} />
+        <DetailItem label={t("atcCode")} value={data.atcCode} />
+        <DetailItem label={t("therapeuticCategoryName")} value={data.therapeuticCategoryName} />
+        <DetailItem label={t("dosageForm")} value={formatOption(data.dosageForm)} />
+        <DetailItem
+          label={t("routeOfAdministration")}
+          value={formatOption(data.routeOfAdministration)}
+        />
+        <DetailItem
+          label={t("regulatoryClass")}
+          value={data.regulatoryClass.map(formatOption).join(", ")}
+        />
+        <DetailItem label={t("manufacturer")} value={data.manufacturer} />
+      </DetailSection>
+      <DetailSection title={t("drugCompositionDosage")}>
+        <DetailItem label={t("activeIngredient")} value={data.composition.activeIngredient} />
+        <DetailItem
+          label={t("activeIngredientAmount")}
+          value={`${data.composition.activeIngredientAmount.amount} ${formatOption(data.composition.activeIngredientAmount.unit)}`}
+        />
+        <DetailItem label={t("appearance")} value={data.composition.appearance} />
+        <DetailItem label={t("standardDosage")} value={data.dosage.standardDosage} wide />
+        <DetailItem label={t("indications")} value={orderedText(data.indications)} wide />
+      </DetailSection>
+      <DetailSection title={t("drugSafety")}>
+        <DetailItem label={t("warning")} value={orderedText(data.warning)} wide />
+        <DetailItem
+          label={t("contraindications")}
+          value={orderedText(data.contraindications)}
+          wide
+        />
+        <DetailItem
+          label={t("importantPrecautions")}
+          value={orderedText(data.importantPrecautions)}
+          wide
+        />
+      </DetailSection>
+      <DetailSection title={t("relatedResources")}>
+        <DetailItem label={t("relatedDiseases")} value={data.relatedDiseaseIds.join(", ")} wide />
+      </DetailSection>
+    </div>
+  );
+}
+
+function DiseaseDetailSections({ data }: { data: Disease }) {
+  return (
+    <div className="detail-sections">
+      <DetailSection title={t("basicInfo")}>
+        <DetailItem label={t("diseaseName")} value={data.name} />
+        <DetailItem label={t("diseaseNameKana")} value={data.nameKana} />
+        <DetailItem label={t("diseaseNameEnglish")} value={data.nameEnglish} />
+        <DetailItem label={t("icd10Chapter")} value={formatOption(data.icd10Chapter)} />
+        <DetailItem label={t("chronicity")} value={formatOption(data.chronicity)} />
+        <DetailItem
+          label={t("medicalDepartment")}
+          value={data.medicalDepartment.map(formatOption).join(", ")}
+        />
+      </DetailSection>
+      <DetailSection title={t("diseaseInfo")}>
+        <DetailItem label={t("summary")} value={data.summary} wide />
+        <DetailItem label={t("etiology")} value={data.etiology} wide />
+        <DetailItem label={t("mainSymptoms")} value={data.symptoms.mainSymptoms.join(", ")} wide />
+        <DetailItem
+          label={t("diagnosticCriteria")}
+          value={data.diagnosticCriteria.required.join(", ")}
+          wide
+        />
+      </DetailSection>
+      <DetailSection title={t("relatedResources")}>
+        <DetailItem label={t("relatedDrugs")} value={data.relatedDrugIds.join(", ")} wide />
+        <DetailItem label={t("relatedDiseases")} value={data.relatedDiseaseIds.join(", ")} wide />
+      </DetailSection>
+    </div>
+  );
+}
+
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="detail-section" aria-labelledby={`detail-${title}`}>
+      <h2 id={`detail-${title}`}>{title}</h2>
+      <dl className="detail-grid">{children}</dl>
+    </section>
+  );
+}
+
+function DetailItem({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string;
+  value: unknown;
+  wide?: boolean;
+}) {
+  return (
+    <div className={wide ? "detail-item detail-item-wide" : "detail-item"}>
+      <dt>{label}</dt>
+      <dd>{displayValue(value)}</dd>
+    </div>
+  );
+}
+
+function displayValue(value: unknown): string {
+  if (value === undefined || value === null || value === "") {
+    return t("unset");
+  }
+  if (typeof value === "boolean") {
+    return value ? t("yes") : t("no");
+  }
+  return String(value);
+}
+
+function orderedText(items: Array<{ order: number; content: string }>): string {
+  return items.map((item) => `${item.order}. ${item.content}`).join("\n");
 }
 
 function ResourceEditor({ kind }: { kind: ResourceKind }) {

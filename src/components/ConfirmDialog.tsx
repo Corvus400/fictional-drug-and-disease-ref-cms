@@ -1,4 +1,14 @@
 import { t } from "@/lib/i18n/messages";
+import {
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogRoot,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -19,29 +29,25 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="dialog-backdrop" role="presentation">
-      <section aria-modal="true" className="dialog" role="dialog" aria-labelledby="confirm-title">
-        <h2 id="confirm-title">{title}</h2>
-        <p>{description}</p>
-        <div className="button-row">
-          <button className="button button-secondary" type="button" onClick={onCancel}>
-            {t("cancel")}
-          </button>
-          <button
-            className="button button-danger"
-            type="button"
-            onClick={onConfirm}
-            disabled={pending}
-          >
-            {pending ? t("loading") : confirmLabel}
-          </button>
-        </div>
-      </section>
-    </div>
+    <AlertDialogRoot open={open} onOpenChange={(nextOpen) => !nextOpen && onCancel()}>
+      <AlertDialogPortal>
+        <AlertDialogOverlay />
+        <AlertDialogContent>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+          <div className="button-row">
+            <AlertDialogCancel className="button button-secondary">{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="button button-danger"
+              onClick={onConfirm}
+              disabled={pending}
+            >
+              {pending ? t("loading") : confirmLabel}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialogPortal>
+    </AlertDialogRoot>
   );
 }
