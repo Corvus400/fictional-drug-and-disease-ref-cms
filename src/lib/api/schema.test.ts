@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { diseaseRequestSchema, drugRequestSchema } from "./schema";
+import {
+  diseaseRequestSchema,
+  dosageForms,
+  drugRequestSchema,
+  medicalDepartments,
+  regulatoryClasses,
+  routeOfAdministration,
+} from "./schema";
 
 describe("CMS request schemas", () => {
   it("strips server-managed drug fields from request payloads", () => {
@@ -16,8 +23,35 @@ describe("CMS request schemas", () => {
       regulatoryClass: ["ordinary"],
       dosageForm: "tablet",
       routeOfAdministration: "oral",
-      contraindications: ["禁忌"],
-      packages: ["PTP 100錠"],
+      composition: {
+        activeIngredient: "架空成分",
+        activeIngredientAmount: { amount: 10, unit: "mg", per: "1錠中" },
+        appearance: "白色の錠剤",
+      },
+      contraindications: [{ order: 1, content: "禁忌" }],
+      indications: [{ order: 1, content: "効能" }],
+      dosage: { standardDosage: "1日1回投与する。" },
+      dosageRelatedPrecautions: [{ order: 1, content: "長期服用時は経過観察する。" }],
+      adverseReactions: {
+        serious: [],
+        other: {
+          over5Percent: [],
+          between1And5Percent: [],
+          under1Percent: [],
+          frequencyUnknown: [],
+        },
+      },
+      packages: [
+        {
+          size: "PTP 100錠",
+          storageCondition: {
+            temperature: "room_temperature",
+            lightProtection: false,
+            moistureProtection: false,
+          },
+          expirationMonths: 36,
+        },
+      ],
       manufacturer: "架空製薬",
     });
 
@@ -36,9 +70,35 @@ describe("CMS request schemas", () => {
       therapeuticCategoryName: "試験薬",
       regulatoryClass: ["ordinary"],
       dosageForm: "injection_form",
-      routeOfAdministration: "injection",
-      contraindications: ["禁忌"],
-      packages: ["バイアル"],
+      routeOfAdministration: "injection_route",
+      composition: {
+        activeIngredient: "架空成分",
+        activeIngredientAmount: { amount: 10, unit: "mg" },
+        appearance: "注射液",
+      },
+      contraindications: [{ order: 1, content: "禁忌" }],
+      indications: [{ order: 1, content: "効能" }],
+      dosage: { standardDosage: "静脈内投与する。" },
+      adverseReactions: {
+        serious: [],
+        other: {
+          over5Percent: [],
+          between1And5Percent: [],
+          under1Percent: [],
+          frequencyUnknown: [],
+        },
+      },
+      packages: [
+        {
+          size: "バイアル",
+          storageCondition: {
+            temperature: "room_temperature",
+            lightProtection: false,
+            moistureProtection: false,
+          },
+          expirationMonths: 24,
+        },
+      ],
       manufacturer: "架空製薬",
     });
 
@@ -60,11 +120,41 @@ describe("CMS request schemas", () => {
       etiology: "原因",
       symptoms: { mainSymptoms: ["発熱"] },
       diagnosticCriteria: { required: ["検査"] },
-      requiredExams: ["血液検査"],
-      treatments: {},
+      requiredExams: [
+        {
+          name: "血液検査",
+          category: "blood_test",
+          typicalFinding: "炎症反応上昇",
+        },
+      ],
+      treatments: {
+        pharmacological: [],
+        nonPharmacological: [],
+        acutePhaseProtocol: [],
+      },
     });
 
     expect(parsed.success).toBe(false);
     expect(parsed.error?.issues.map((issue) => issue.path.join("."))).toContain("infectious");
+  });
+
+  it("matches model wire enum values from 03 and 04", () => {
+    expect(dosageForms).toContain("liquid");
+    expect(dosageForms).toContain("inhaler");
+    expect(dosageForms).not.toContain("oral_solution");
+    expect(dosageForms).not.toContain("inhalation");
+
+    expect(routeOfAdministration).toContain("injection_route");
+    expect(routeOfAdministration).not.toContain("injection");
+
+    expect(regulatoryClasses).toContain("stimulant_precursor");
+    expect(regulatoryClasses).toContain("prescription_required");
+    expect(regulatoryClasses).not.toContain("prescription_only");
+
+    expect(medicalDepartments).toContain("otolaryngology");
+    expect(medicalDepartments).toContain("gynecology");
+    expect(medicalDepartments).toContain("emergency");
+    expect(medicalDepartments).toContain("infectious_disease");
+    expect(medicalDepartments).not.toContain("respiratory_medicine");
   });
 });

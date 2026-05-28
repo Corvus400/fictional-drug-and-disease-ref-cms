@@ -19,6 +19,7 @@ import {
   routeOfAdministration,
 } from "@/lib/api/schema";
 import { t } from "@/lib/i18n/messages";
+import { ErrorNotice } from "./ErrorNotice";
 import { FieldArrayEditor } from "./FieldArrayEditor";
 import { ReferencePicker } from "./ReferencePicker";
 
@@ -63,20 +64,28 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
       }
       return;
     }
-    save.mutate(parsed.data as FormValue, {
-      onSuccess: (saved) => {
-        form.reset(toDefaultValue(kind, saved) as FormRecord);
-        onSaved?.(saved.id);
+    const patch = (buildDirtyPatch(parsed.data, form.formState.dirtyFields) ??
+      {}) as Partial<FormValue>;
+    save.mutate(
+      {
+        data: parsed.data as FormValue,
+        patch,
       },
-      onError: (error) => {
-        if (typeof error === "object" && error !== null && "fields" in error) {
-          const fields = error.fields as Array<{ field: string; message: string }>;
-          for (const field of fields) {
-            form.setError(field.field as Path<FormRecord>, { message: field.message });
+      {
+        onSuccess: (saved) => {
+          form.reset(toDefaultValue(kind, saved) as FormRecord);
+          onSaved?.(saved.id);
+        },
+        onError: (error) => {
+          if (typeof error === "object" && error !== null && "fields" in error) {
+            const fields = error.fields as Array<{ field: string; message: string }>;
+            for (const field of fields) {
+              form.setError(field.field as Path<FormRecord>, { message: field.message });
+            }
           }
-        }
+        },
       },
-    });
+    );
   }
 
   return (
@@ -92,6 +101,7 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
         ) : (
           <DiseaseFields selfId={initialValue?.id} />
         )}
+        {save.error ? <ErrorNotice error={save.error} /> : null}
         <div className="button-row sticky-actions">
           <button className="button button-primary" type="submit" disabled={save.isPending}>
             <Save aria-hidden="true" size={16} />
@@ -108,6 +118,33 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
   );
 }
 
+function buildDirtyPatch(value: unknown, dirty: unknown): unknown {
+  if (dirty === true) {
+    return value;
+  }
+  if (dirty === undefined || dirty === false || dirty === null) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value !== "object" || value === null || typeof dirty !== "object") {
+    return undefined;
+  }
+
+  const patch: Record<string, unknown> = {};
+  for (const key of Object.keys(dirty)) {
+    const child = buildDirtyPatch(
+      (value as Record<string, unknown>)[key],
+      (dirty as Record<string, unknown>)[key],
+    );
+    if (child !== undefined) {
+      patch[key] = child;
+    }
+  }
+  return Object.keys(patch).length === 0 ? undefined : patch;
+}
+
 function DrugFields({ selfId }: { selfId?: string }) {
   return (
     <>
@@ -116,6 +153,7 @@ function DrugFields({ selfId }: { selfId?: string }) {
         <TextField name="genericName" label="一般名" required />
         <TextField name="brandNameKana" label="販売名カナ" required />
         <TextField name="atcCode" label="ATC コード" required />
+        <TextField name="yjCode" label="日本標準商品分類番号" />
         <TextField name="therapeuticCategoryName" label="薬効分類名" required />
         <SelectField name="dosageForm" label="剤形" options={dosageForms} />
         <SelectField
@@ -126,16 +164,35 @@ function DrugFields({ selfId }: { selfId?: string }) {
         <MultiSelectField name="regulatoryClass" label="規制区分" options={regulatoryClasses} />
         <TextField name="manufacturer" label="製造販売業者" required />
       </Section>
-      <Section title="添付文書セクション">
+      <Section title="組成・用法">
         <JsonField name="composition" label="組成・性状 JSON" />
         <JsonField name="dosage" label="用法・用量 JSON" />
+        <JsonField name="dosageRelatedPrecautions" label="用法用量に関連する注意 JSON" />
+        <JsonField name="indications" label="効能・効果 JSON" />
+        <JsonField name="indicationsRelatedPrecautions" label="効能効果に関連する注意 JSON" />
+      </Section>
+      <Section title="安全性・注意">
+        <JsonField name="warning" label="警告 JSON" />
+        <JsonField name="contraindications" label="禁忌 JSON" />
+        <JsonField name="importantPrecautions" label="重要な基本的注意 JSON" />
+        <JsonField name="precautionsForSpecificPopulations" label="特定背景患者注意 JSON" />
+        <JsonField name="interactions" label="相互作用 JSON" />
+        <JsonField name="adverseReactions" label="副作用 JSON" />
+        <JsonField name="effectsOnLabTests" label="臨床検査結果に及ぼす影響 JSON" />
+        <JsonField name="overdose" label="過量投与 JSON" />
+        <JsonField name="administrationPrecautions" label="適用上の注意 JSON" />
+        <JsonField name="otherPrecautions" label="その他の注意 JSON" />
+      </Section>
+      <Section title="薬理・補助情報">
         <JsonField name="pharmacokinetics" label="薬物動態 JSON" />
-        <FieldArrayEditor name="warning" label="警告" />
-        <FieldArrayEditor name="contraindications" label="禁忌" required />
-        <FieldArrayEditor name="indications" label="効能・効果" />
-        <FieldArrayEditor name="administrationPrecautions" label="適用上の注意" />
-        <FieldArrayEditor name="handlingPrecautions" label="取扱い上の注意" />
-        <FieldArrayEditor name="packages" label="包装" required />
+        <JsonField name="clinicalResults" label="臨床成績 JSON" />
+        <JsonField name="pharmacology" label="薬効薬理 JSON" />
+        <JsonField name="physicochemicalProperties" label="理化学的知見 JSON" />
+        <JsonField name="handlingPrecautions" label="取扱い上の注意 JSON" />
+        <JsonField name="approvalConditions" label="承認条件 JSON" />
+        <JsonField name="packages" label="包装 JSON" />
+        <JsonField name="references" label="主要文献 JSON" />
+        <JsonField name="insuranceNotes" label="保険給付上の注意 JSON" />
       </Section>
       <Section title="関連リソース">
         <ReferencePicker
@@ -160,15 +217,20 @@ function DiseaseFields({ selfId }: { selfId?: string }) {
         <SelectField name="chronicity" label="慢性度" options={chronicities} />
         <CheckboxField name="infectious" label="感染性" />
         <MultiSelectField name="medicalDepartment" label="診療科" options={medicalDepartments} />
+        <FieldArrayEditor name="synonyms" label="別名・同義語" />
       </Section>
       <Section title="疾患情報">
         <TextAreaField name="summary" label="概説" required />
         <TextAreaField name="etiology" label="原因・病態" required />
         <JsonField name="epidemiology" label="疫学 JSON" />
+        <JsonField name="symptoms" label="症状 JSON" />
+        <JsonField name="diagnosticCriteria" label="診断基準 JSON" />
+        <JsonField name="requiredExams" label="必須検査 JSON" />
+        <JsonField name="severityGrading" label="重症度分類 JSON" />
+        <FieldArrayEditor name="differentialDiagnoses" label="鑑別診断" />
+        <FieldArrayEditor name="complications" label="合併症" />
         <JsonField name="treatments" label="治療 JSON" />
-        <FieldArrayEditor name="symptoms.mainSymptoms" label="主症状" required />
-        <FieldArrayEditor name="diagnosticCriteria.required" label="診断基準" required />
-        <FieldArrayEditor name="requiredExams" label="必須検査" required />
+        <TextAreaField name="prognosis" label="予後" />
         <FieldArrayEditor name="prevention" label="予防" />
       </Section>
       <Section title="関連リソース">
@@ -319,18 +381,65 @@ function toDefaultValue(kind: ResourceKind, value?: Drug | Disease): Partial<For
       brandName: "",
       brandNameKana: "",
       atcCode: "A00AA00",
+      yjCode: "",
       therapeuticCategoryName: "",
       regulatoryClass: ["ordinary"],
       dosageForm: "tablet",
       routeOfAdministration: "oral",
-      composition: {},
+      composition: {
+        activeIngredient: "",
+        activeIngredientAmount: { amount: 0, unit: "mg", per: "" },
+        inactiveIngredients: [],
+        appearance: "",
+        identificationCode: "",
+      },
       warning: [],
-      contraindications: [""],
-      indications: [""],
-      dosage: {},
+      contraindications: [{ order: 1, content: "" }],
+      indications: [{ order: 1, content: "" }],
+      indicationsRelatedPrecautions: [],
+      dosage: {
+        standardDosage: "",
+        ageSpecificDosage: [],
+        renalAdjustment: [],
+        hepaticAdjustment: [],
+      },
+      dosageRelatedPrecautions: [],
+      importantPrecautions: [],
+      precautionsForSpecificPopulations: [],
+      interactions: null,
+      adverseReactions: {
+        serious: [],
+        other: {
+          over5Percent: [],
+          between1And5Percent: [],
+          under1Percent: [],
+          frequencyUnknown: [],
+        },
+      },
+      effectsOnLabTests: [],
+      overdose: null,
       administrationPrecautions: [],
+      otherPrecautions: [],
+      pharmacokinetics: null,
+      clinicalResults: [],
+      pharmacology: null,
+      physicochemicalProperties: null,
       handlingPrecautions: [],
-      packages: [""],
+      approvalConditions: [],
+      packages: [
+        {
+          size: "",
+          storageCondition: {
+            temperature: "room_temperature",
+            lightProtection: false,
+            moistureProtection: false,
+            additionalNote: "",
+          },
+          expirationMonths: 36,
+        },
+      ],
+      references: [],
+      insuranceNotes: [],
       manufacturer: "",
       relatedDiseaseIds: [],
       ...value,
@@ -345,13 +454,34 @@ function toDefaultValue(kind: ResourceKind, value?: Drug | Disease): Partial<For
     medicalDepartment: ["internal_medicine"],
     chronicity: "acute",
     infectious: true,
+    synonyms: [],
     summary: "",
-    epidemiology: {},
+    epidemiology: {
+      prevalence: null,
+      onsetAgeRange: null,
+      sexRatio: null,
+      riskFactors: [],
+    },
     etiology: "",
-    symptoms: { mainSymptoms: [""] },
-    diagnosticCriteria: { required: [""] },
-    requiredExams: [""],
-    treatments: {},
+    symptoms: { mainSymptoms: [""], associatedSymptoms: [], onsetPattern: "acute" },
+    diagnosticCriteria: { required: [""], supporting: [], notes: "" },
+    requiredExams: [
+      {
+        name: "",
+        category: "blood_test",
+        typicalFinding: "",
+        referenceRange: "",
+      },
+    ],
+    severityGrading: null,
+    differentialDiagnoses: [],
+    complications: [],
+    treatments: {
+      pharmacological: [],
+      nonPharmacological: [],
+      acutePhaseProtocol: [],
+    },
+    prognosis: "",
     prevention: [],
     relatedDrugIds: [],
     relatedDiseaseIds: [],

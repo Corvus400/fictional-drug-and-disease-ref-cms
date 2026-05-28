@@ -5,79 +5,314 @@ export const dosageForms = [
   "capsule",
   "powder",
   "granule",
-  "oral_solution",
+  "liquid",
   "injection_form",
   "ointment",
   "cream",
   "patch",
   "eye_drops",
-  "nasal_spray",
   "suppository",
-  "inhalation",
+  "inhaler",
+  "nasal_spray",
 ] as const;
 
 export const routeOfAdministration = [
   "oral",
-  "injection",
   "topical",
-  "transdermal",
+  "injection_route",
+  "inhalation",
+  "rectal",
   "ophthalmic",
   "nasal",
-  "rectal",
-  "inhalation",
+  "transdermal",
 ] as const;
 
 export const regulatoryClasses = [
-  "ordinary",
   "poison",
   "potent",
-  "prescription_only",
-  "habit_forming",
-  "narcotic",
+  "ordinary",
   "psychotropic_1",
   "psychotropic_2",
   "psychotropic_3",
+  "narcotic",
+  "stimulant_precursor",
   "biological",
   "specified_biological",
+  "prescription_required",
 ] as const;
 
 export const icd10Chapters = Array.from(
   { length: 22 },
   (_, index) => `chapter_${toRoman(index + 1)}`,
-);
+) as [string, ...string[]];
 
 export const medicalDepartments = [
   "internal_medicine",
   "cardiology",
-  "respiratory_medicine",
   "gastroenterology",
   "endocrinology",
-  "nephrology",
   "neurology",
   "psychiatry",
-  "pediatrics",
   "surgery",
   "orthopedics",
   "dermatology",
   "ophthalmology",
-  "otorhinolaryngology",
-  "obstetrics_gynecology",
+  "otolaryngology",
   "urology",
+  "gynecology",
+  "pediatrics",
+  "emergency",
+  "infectious_disease",
 ] as const;
 
 export const chronicities = ["acute", "subacute", "chronic", "relapsing"] as const;
 
+const doseUnits = [
+  "mg",
+  "g",
+  "microgram",
+  "ml",
+  "l",
+  "iu",
+  "meq",
+  "mol",
+  "mmol",
+  "percent",
+] as const;
+const storageTemperatures = ["room_temperature", "cold", "frozen"] as const;
+const precautionPopulationCategories = [
+  "comorbidity",
+  "renal_impairment",
+  "hepatic_impairment",
+  "reproductive_potential",
+  "pregnant",
+  "lactating",
+  "pediatric",
+  "geriatric",
+] as const;
+const renalSeverities = ["normal", "mild", "moderate", "severe", "end_stage"] as const;
+const hepaticSeverities = ["mild", "moderate", "severe"] as const;
+const frequencyBands = [
+  "over_5_percent",
+  "between_1_and_5_percent",
+  "under_1_percent",
+  "unknown",
+] as const;
+const onsetPatterns = ["acute", "subacute", "chronic", "intermittent", "relapsing"] as const;
+const prevalenceUnits = ["per_population", "per_patient", "per_birth"] as const;
+const examCategories = [
+  "blood_test",
+  "imaging",
+  "physiological",
+  "pathology",
+  "interview",
+] as const;
+
 const nonEmptyString = z.string().trim().min(1);
-const stringArrayBase = z.array(z.string().trim());
-const stringArray = stringArrayBase.default([]);
-const recordValue = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.null(),
-  z.array(z.unknown()),
-  z.record(z.string(), z.unknown()),
-]);
+const optionalString = z.string().optional().or(z.literal(""));
+const stringArray = z.array(z.string().trim()).default([]);
+const nonEmptyStringArray = z.array(nonEmptyString).min(1);
+
+const numberedParagraphSchema = z.object({
+  order: z.coerce.number().int().positive(),
+  subOrder: z.coerce.number().int().positive().nullable().optional(),
+  content: nonEmptyString,
+});
+
+const indicationItemSchema = z.object({
+  order: z.coerce.number().int().positive(),
+  content: nonEmptyString,
+});
+
+const doseSchema = z.object({
+  amount: z.coerce.number(),
+  unit: z.enum(doseUnits),
+  per: optionalString,
+});
+
+const compositionSchema = z.object({
+  activeIngredient: nonEmptyString,
+  activeIngredientAmount: doseSchema,
+  inactiveIngredients: stringArray,
+  appearance: nonEmptyString,
+  identificationCode: optionalString,
+});
+
+const ageRangeSchema = z.object({
+  minAgeMonths: z.coerce.number().int().nullable().optional(),
+  maxAgeMonths: z.coerce.number().int().nullable().optional(),
+  label: nonEmptyString,
+});
+
+const crClRangeSchema = z.object({
+  minMlPerMin: z.coerce.number().int().nullable().optional(),
+  maxMlPerMin: z.coerce.number().int().nullable().optional(),
+  severity: z.enum(renalSeverities),
+  label: nonEmptyString,
+});
+
+const dosageSchema = z.object({
+  standardDosage: nonEmptyString,
+  ageSpecificDosage: z.array(z.object({ range: ageRangeSchema, dose: nonEmptyString })).default([]),
+  renalAdjustment: z.array(z.object({ range: crClRangeSchema, dose: nonEmptyString })).default([]),
+  hepaticAdjustment: z
+    .array(z.object({ severity: z.enum(hepaticSeverities), dose: nonEmptyString }))
+    .default([]),
+});
+
+const precautionPopulationSchema = z.object({
+  category: z.enum(precautionPopulationCategories),
+  note: nonEmptyString,
+});
+
+const interactionEntrySchema = z.object({
+  drugId: optionalString,
+  displayName: nonEmptyString,
+  clinicalSymptom: nonEmptyString,
+  mechanism: nonEmptyString,
+});
+
+const interactionSchema = z.object({
+  combinationProhibited: z.array(interactionEntrySchema).default([]),
+  combinationCaution: z.array(interactionEntrySchema).default([]),
+});
+
+const adverseReactionSchema = z.object({
+  name: nonEmptyString,
+  frequency: z.enum(frequencyBands),
+  symptom: nonEmptyString,
+  initialSigns: nonEmptyString,
+  countermeasure: nonEmptyString,
+});
+
+const adverseReactionByFrequencySchema = z.object({
+  over5Percent: stringArray,
+  between1And5Percent: stringArray,
+  under1Percent: stringArray,
+  frequencyUnknown: stringArray,
+});
+
+const adverseReactionsSchema = z.object({
+  serious: z.array(adverseReactionSchema).default([]),
+  other: adverseReactionByFrequencySchema,
+});
+
+const pharmacokineticsSchema = z.object({
+  bloodConcentration: optionalString,
+  absorption: optionalString,
+  distribution: optionalString,
+  metabolism: optionalString,
+  excretion: optionalString,
+  parameters: z.array(z.object({ name: nonEmptyString, value: nonEmptyString })).default([]),
+});
+
+const packageSchema = z.object({
+  size: nonEmptyString,
+  storageCondition: z.object({
+    temperature: z.enum(storageTemperatures),
+    lightProtection: z.boolean(),
+    moistureProtection: z.boolean(),
+    additionalNote: optionalString,
+  }),
+  expirationMonths: z.coerce.number().int().positive(),
+});
+
+const referenceSchema = z.object({
+  citation: nonEmptyString,
+  source: optionalString,
+});
+
+const examSchema = z.object({
+  name: nonEmptyString,
+  category: z.enum(examCategories),
+  typicalFinding: nonEmptyString,
+  referenceRange: optionalString,
+});
+
+const epidemiologySchema = z.object({
+  prevalence: z
+    .object({
+      rate: z.coerce.number().nullable().optional(),
+      denominator: z.coerce.number().int().nullable().optional(),
+      unit: z.enum(prevalenceUnits).default("per_population"),
+      label: nonEmptyString,
+    })
+    .nullable()
+    .optional(),
+  onsetAgeRange: z
+    .object({
+      minAgeYears: z.coerce.number().int().nullable().optional(),
+      maxAgeYears: z.coerce.number().int().nullable().optional(),
+      label: nonEmptyString,
+    })
+    .nullable()
+    .optional(),
+  sexRatio: z
+    .object({
+      maleRatio: z.coerce.number().int(),
+      femaleRatio: z.coerce.number().int(),
+      note: optionalString,
+    })
+    .nullable()
+    .optional(),
+  riskFactors: stringArray,
+});
+
+const symptomsSchema = z.object({
+  mainSymptoms: nonEmptyStringArray,
+  associatedSymptoms: stringArray,
+  onsetPattern: z.enum(onsetPatterns).nullable().optional(),
+});
+
+const diagnosticCriteriaSchema = z.object({
+  required: nonEmptyStringArray,
+  supporting: stringArray,
+  notes: optionalString,
+});
+
+const severitySchema = z.object({
+  gradingSystem: nonEmptyString,
+  grades: z
+    .array(
+      z.object({
+        label: nonEmptyString,
+        criteria: nonEmptyString,
+        recommendedAction: nonEmptyString,
+      }),
+    )
+    .min(2),
+});
+
+const treatmentsSchema = z.object({
+  pharmacological: z
+    .array(
+      z.object({
+        drugCategory: nonEmptyString,
+        drugIds: stringArray,
+        indication: nonEmptyString,
+        notes: nonEmptyString,
+      }),
+    )
+    .default([]),
+  nonPharmacological: z
+    .array(
+      z.object({
+        heading: nonEmptyString,
+        items: stringArray,
+        description: optionalString,
+      }),
+    )
+    .default([]),
+  acutePhaseProtocol: z
+    .array(
+      z.object({
+        order: z.coerce.number().int().positive(),
+        action: nonEmptyString,
+        target: optionalString,
+      }),
+    )
+    .default([]),
+});
 
 export const drugRequestSchema = z
   .object({
@@ -85,44 +320,98 @@ export const drugRequestSchema = z
     brandName: nonEmptyString,
     brandNameKana: nonEmptyString,
     atcCode: z.string().regex(/^[ABCDGHJLMNPRSV][0-9]{2}[A-Z][A-Z][0-9]{2}$/),
-    yjCode: z.string().optional().or(z.literal("")),
+    yjCode: optionalString,
     therapeuticCategoryName: nonEmptyString,
     regulatoryClass: z.array(z.enum(regulatoryClasses)).min(1),
     dosageForm: z.enum(dosageForms),
     routeOfAdministration: z.enum(routeOfAdministration),
-    composition: z.record(z.string(), recordValue).default({}),
-    warning: stringArray,
-    contraindications: stringArrayBase.min(1).default([""]),
-    indications: stringArray,
-    dosage: z.record(z.string(), recordValue).default({}),
-    administrationPrecautions: stringArray,
-    pharmacokinetics: z.record(z.string(), recordValue).optional(),
-    handlingPrecautions: stringArray,
-    packages: stringArrayBase.min(1).default([""]),
+    composition: compositionSchema,
+    warning: z.array(numberedParagraphSchema).default([]),
+    contraindications: z.array(numberedParagraphSchema).min(1),
+    indications: z.array(indicationItemSchema).min(1),
+    indicationsRelatedPrecautions: z.array(numberedParagraphSchema).default([]),
+    dosage: dosageSchema,
+    dosageRelatedPrecautions: z.array(numberedParagraphSchema).default([]),
+    importantPrecautions: z.array(numberedParagraphSchema).default([]),
+    precautionsForSpecificPopulations: z.array(precautionPopulationSchema).default([]),
+    interactions: interactionSchema.nullable().optional(),
+    adverseReactions: adverseReactionsSchema,
+    effectsOnLabTests: z.array(numberedParagraphSchema).default([]),
+    overdose: z
+      .object({ symptoms: nonEmptyString, management: nonEmptyString })
+      .nullable()
+      .optional(),
+    administrationPrecautions: z.array(numberedParagraphSchema).default([]),
+    otherPrecautions: z.array(numberedParagraphSchema).default([]),
+    pharmacokinetics: pharmacokineticsSchema.nullable().optional(),
+    clinicalResults: z
+      .array(z.object({ heading: nonEmptyString, content: nonEmptyString }))
+      .default([]),
+    pharmacology: z
+      .object({ mechanism: nonEmptyString, effect: nonEmptyString })
+      .nullable()
+      .optional(),
+    physicochemicalProperties: z
+      .object({
+        genericNameEnglish: nonEmptyString,
+        molecularFormula: nonEmptyString,
+        molecularWeight: z.coerce.number().nullable().optional(),
+        description: nonEmptyString,
+      })
+      .nullable()
+      .optional(),
+    handlingPrecautions: z.array(numberedParagraphSchema).default([]),
+    approvalConditions: z.array(numberedParagraphSchema).default([]),
+    packages: z.array(packageSchema).min(1),
+    references: z.array(referenceSchema).default([]),
+    insuranceNotes: z.array(numberedParagraphSchema).default([]),
     manufacturer: nonEmptyString,
     relatedDiseaseIds: stringArray,
   })
   .superRefine((value, ctx) => {
+    const externalForms = ["ointment", "cream", "patch", "eye_drops", "nasal_spray", "suppository"];
     const injectable =
-      value.dosageForm === "injection_form" || value.routeOfAdministration === "injection";
+      value.dosageForm === "injection_form" || value.routeOfAdministration === "injection_route";
+    const needsAdministrationPrecaution = injectable || externalForms.includes(value.dosageForm);
     const biological = value.regulatoryClass.some((item) =>
       ["biological", "specified_biological"].includes(item),
     );
     const hazardous = value.regulatoryClass.some((item) => ["poison", "potent"].includes(item));
+    const controlled = value.regulatoryClass.some((item) =>
+      ["narcotic", "psychotropic_1", "psychotropic_2", "psychotropic_3"].includes(item),
+    );
+    const chronicLongTerm = value.atcCode.startsWith("A") || value.atcCode.startsWith("C");
 
-    if (injectable && value.administrationPrecautions.length === 0) {
+    if (needsAdministrationPrecaution && value.administrationPrecautions.length === 0) {
       ctx.addIssue({
         code: "custom",
         path: ["administrationPrecautions"],
-        message: "注射剤は適用上の注意が必要です。",
+        message: "この剤形または投与経路では適用上の注意が必要です。",
       });
     }
-    if (injectable && value.pharmacokinetics === undefined) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["pharmacokinetics"],
-        message: "注射剤は薬物動態が必要です。",
-      });
+    if (injectable) {
+      if (value.pharmacokinetics == null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["pharmacokinetics"],
+          message: "注射剤は薬物動態が必要です。",
+        });
+      } else {
+        if (!value.pharmacokinetics.bloodConcentration) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["pharmacokinetics", "bloodConcentration"],
+            message: "注射剤は血中濃度情報が必要です。",
+          });
+        }
+        if (!value.pharmacokinetics.metabolism && !value.pharmacokinetics.excretion) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["pharmacokinetics", "metabolism"],
+            message: "注射剤は代謝または排泄情報が必要です。",
+          });
+        }
+      }
     }
     if (biological && value.handlingPrecautions.length === 0) {
       ctx.addIssue({
@@ -132,10 +421,20 @@ export const drugRequestSchema = z
       });
     }
     if ((biological || hazardous) && value.warning.length === 0) {
+      ctx.addIssue({ code: "custom", path: ["warning"], message: "警告が必要です。" });
+    }
+    if (controlled && value.insuranceNotes.length === 0) {
       ctx.addIssue({
         code: "custom",
-        path: ["warning"],
-        message: "警告が必要です。",
+        path: ["insuranceNotes"],
+        message: "麻薬・向精神薬は保険給付上の注意が必要です。",
+      });
+    }
+    if (chronicLongTerm && value.dosageRelatedPrecautions.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["dosageRelatedPrecautions"],
+        message: "A/C 群薬剤は用法用量に関連する注意が必要です。",
       });
     }
   });
@@ -144,45 +443,71 @@ export const diseaseRequestSchema = z
   .object({
     name: nonEmptyString,
     nameKana: nonEmptyString,
-    nameEnglish: z.string().optional().or(z.literal("")),
-    icd10Chapter: z.enum(icd10Chapters as [string, ...string[]]),
+    nameEnglish: optionalString,
+    icd10Chapter: z.enum(icd10Chapters),
     medicalDepartment: z.array(z.enum(medicalDepartments)).min(1),
     chronicity: z.enum(chronicities),
     infectious: z.boolean(),
+    synonyms: stringArray,
     summary: nonEmptyString,
-    epidemiology: z.record(z.string(), recordValue).optional(),
+    epidemiology: epidemiologySchema.nullable().optional(),
     etiology: nonEmptyString,
-    symptoms: z
-      .object({
-        mainSymptoms: stringArrayBase.min(1),
-        onsetPattern: z.string().optional(),
-      })
-      .default({ mainSymptoms: [] }),
-    diagnosticCriteria: z
-      .object({
-        required: stringArrayBase.min(1),
-      })
-      .default({ required: [] }),
-    requiredExams: stringArrayBase.min(1).default([""]),
-    treatments: z.record(z.string(), recordValue).default({}),
-    prognosis: z.string().optional().or(z.literal("")),
+    symptoms: symptomsSchema,
+    diagnosticCriteria: diagnosticCriteriaSchema,
+    requiredExams: z.array(examSchema).min(1),
+    severityGrading: severitySchema.nullable().optional(),
+    differentialDiagnoses: stringArray,
+    complications: stringArray,
+    treatments: treatmentsSchema,
+    prognosis: optionalString,
     prevention: stringArray,
     relatedDrugIds: stringArray,
     relatedDiseaseIds: stringArray,
   })
   .superRefine((value, ctx) => {
-    if (value.icd10Chapter === "chapter_i" && !value.infectious) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["infectious"],
-        message: "ICD-10 第 I 章は感染性を true にしてください。",
-      });
+    if (value.icd10Chapter === "chapter_i") {
+      if (!value.infectious) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["infectious"],
+          message: "ICD-10 第 I 章は感染性を true にしてください。",
+        });
+      }
+      if (value.epidemiology == null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["epidemiology"],
+          message: "感染症は疫学情報が必要です。",
+        });
+      }
+      if (!value.symptoms.onsetPattern) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["symptoms", "onsetPattern"],
+          message: "感染症は発症様式が必要です。",
+        });
+      }
+      if (value.prevention.length === 0) {
+        ctx.addIssue({ code: "custom", path: ["prevention"], message: "感染症は予防が必要です。" });
+      }
     }
-    if (value.icd10Chapter === "chapter_i" && value.epidemiology === undefined) {
+    if (value.icd10Chapter === "chapter_ii") {
+      if (value.severityGrading == null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["severityGrading"],
+          message: "重症度分類が必要です。",
+        });
+      }
+      if (!value.prognosis) {
+        ctx.addIssue({ code: "custom", path: ["prognosis"], message: "予後が必要です。" });
+      }
+    }
+    if (value.icd10Chapter === "chapter_iv" && value.treatments.pharmacological.length === 0) {
       ctx.addIssue({
         code: "custom",
-        path: ["epidemiology"],
-        message: "感染症は疫学情報が必要です。",
+        path: ["treatments", "pharmacological"],
+        message: "内分泌代謝疾患は薬物療法が必要です。",
       });
     }
     if (value.icd10Chapter === "chapter_v" && value.symptoms.mainSymptoms.length < 3) {
@@ -192,11 +517,56 @@ export const diseaseRequestSchema = z
         message: "第 V 章は主症状を 3 件以上入力してください。",
       });
     }
+    if (value.icd10Chapter === "chapter_ix") {
+      if (value.severityGrading == null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["severityGrading"],
+          message: "重症度分類が必要です。",
+        });
+      }
+      if (!value.requiredExams.some((exam) => exam.category === "imaging")) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["requiredExams"],
+          message: "循環器系疾患は画像検査が必要です。",
+        });
+      }
+      if (value.chronicity === "acute" && value.treatments.acutePhaseProtocol.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["treatments", "acutePhaseProtocol"],
+          message: "急性循環器系疾患は急性期対応が必要です。",
+        });
+      }
+    }
+    if (value.icd10Chapter === "chapter_xv") {
+      if (value.epidemiology == null) {
+        ctx.addIssue({ code: "custom", path: ["epidemiology"], message: "疫学情報が必要です。" });
+      } else {
+        if (value.epidemiology.onsetAgeRange == null) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["epidemiology", "onsetAgeRange"],
+            message: "好発年齢が必要です。",
+          });
+        }
+        if (value.epidemiology.sexRatio == null) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["epidemiology", "sexRatio"],
+            message: "男女比が必要です。",
+          });
+        }
+      }
+    }
   });
 
 export const serverFieldsSchema = z.object({
   id: z.string(),
   revisedAt: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
   disclaimer: z.string().optional(),
 });
 
@@ -204,6 +574,8 @@ export const drugSchema = drugRequestSchema
   .extend({
     id: z.string(),
     revisedAt: z.string().optional(),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
     imageUrl: z.string().optional(),
     disclaimer: z.string().optional(),
   })

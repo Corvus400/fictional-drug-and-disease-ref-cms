@@ -316,6 +316,7 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
           })
         }
       />
+      {remove.error ? <ErrorNotice error={remove.error} /> : null}
     </section>
   );
 }

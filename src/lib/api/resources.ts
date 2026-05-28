@@ -55,11 +55,11 @@ export function useResourceDetail(kind: ResourceKind, id: string, enabled = true
 export function useSaveResource(kind: ResourceKind, id?: string, etag?: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: DrugRequest | DiseaseRequest) => {
+    mutationFn: async (payload: SaveResourcePayload) => {
       const result =
         id === undefined
-          ? await createResource(kind, data)
-          : await updateResource(kind, id, data, etag);
+          ? await createResource(kind, payload.data)
+          : await patchResource(kind, id, payload.patch, etag);
       if (!result.ok) {
         throw result.error;
       }
@@ -71,6 +71,11 @@ export function useSaveResource(kind: ResourceKind, id?: string, etag?: string) 
     },
   });
 }
+
+export type SaveResourcePayload = {
+  data: DrugRequest | DiseaseRequest;
+  patch: Partial<DrugRequest> | Partial<DiseaseRequest>;
+};
 
 export function useDeleteResource(kind: ResourceKind, id: string, etag?: string) {
   const queryClient = useQueryClient();
@@ -135,17 +140,20 @@ async function createResource(kind: ResourceKind, data: DrugRequest | DiseaseReq
   });
 }
 
-async function updateResource(
+export async function patchResource(
   kind: ResourceKind,
   id: string,
-  data: DrugRequest | DiseaseRequest,
+  patch: Partial<DrugRequest> | Partial<DiseaseRequest>,
   etag?: string,
 ) {
   return apiFetch({
     path: `/v1/admin/${kind}/${id}`,
-    method: "PUT",
-    body: requestSchema(kind).parse(data),
-    headers: etag === undefined ? undefined : { "If-Match": etag },
+    method: "PATCH",
+    body: patch,
+    headers: {
+      ...(etag === undefined ? {} : { "If-Match": etag }),
+      "Content-Type": "application/merge-patch+json",
+    },
     schema: responseSchema(kind),
   });
 }
