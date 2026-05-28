@@ -23,4 +23,12 @@ describe("problem+json mapping", () => {
   it("converts bracket paths to React Hook Form dot paths", () => {
     expect(toFormPath("items[2].name")).toBe("items.2.name");
   });
+
+  it("converts backend snake case field paths to React Hook Form camel case paths", () => {
+    expect(toFormPath("generic_name")).toBe("genericName");
+    expect(toFormPath("related_disease_ids[0]")).toBe("relatedDiseaseIds.0");
+    expect(toFormPath("composition.active_ingredient_amount.amount")).toBe(
+      "composition.activeIngredientAmount.amount",
+    );
+  });
 });
