@@ -17,9 +17,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm dev --host 127.0.0.1",
+    command: "pnpm build && pnpm preview --host 127.0.0.1 --port 5173",
     url: "http://127.0.0.1:5173",
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     env: {
       VITE_API_BASE_URL: "http://127.0.0.1:19090",
       VITE_API_TIMEOUT_MS: "10000",

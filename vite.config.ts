@@ -4,10 +4,28 @@ import tailwindcss from "@tailwindcss/vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+const strictCsp = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "connect-src 'self' http://127.0.0.1:19090",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+const devCsp = strictCsp
+  .replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")
+  .replace(
+    "connect-src 'self' http://127.0.0.1:19090",
+    "connect-src 'self' http://127.0.0.1:19090 ws://127.0.0.1:*",
+  );
+
 export default defineConfig(({ command }) => ({
   plugins: [
-    react(),
     ...(command === "build" ? [babel({ presets: [reactCompilerPreset()] })] : []),
+    react(),
     tailwindcss(),
   ],
   resolve: {
@@ -17,16 +35,12 @@ export default defineConfig(({ command }) => ({
   },
   server: {
     headers: {
-      "Content-Security-Policy": [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
-        "connect-src 'self' http://127.0.0.1:19090 ws://127.0.0.1:*",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "frame-ancestors 'none'",
-      ].join("; "),
+      "Content-Security-Policy": devCsp,
+    },
+  },
+  preview: {
+    headers: {
+      "Content-Security-Policy": strictCsp,
     },
   },
 }));

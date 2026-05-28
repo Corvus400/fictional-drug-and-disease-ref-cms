@@ -12,5 +12,6 @@ repos:
         name: CMS typecheck test and React hooks lint
         entry: pnpm prepush
         language: system
+        always_run: true
         pass_filenames: false
         stages: [pre-push]
