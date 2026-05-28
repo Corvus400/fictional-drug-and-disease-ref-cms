@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import { useController, useFormContext } from "react-hook-form";
-import { useResourceList } from "@/lib/api/resources";
+import { useResourceDetail, useResourceList } from "@/lib/api/resources";
 import type { ResourceKind } from "@/lib/api/schema";
 import { type MessageKey, t } from "@/lib/i18n/messages";
 
@@ -13,7 +13,7 @@ type ReferencePickerProps = {
 
 export function ReferencePicker({ name, labelKey, kind, selfId }: ReferencePickerProps) {
   const { control } = useFormContext();
-  const { field } = useController({ control, name });
+  const { field } = useController({ control, name, defaultValue: [] });
   const searchId = useId();
   const label = t(labelKey);
   const [query, setQuery] = useState("");
@@ -22,7 +22,7 @@ export function ReferencePicker({ name, labelKey, kind, selfId }: ReferencePicke
     [field.value],
   );
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const list = useResourceList(kind, { page: 1, pageSize: 100 });
+  const list = useResourceList(kind, { page: 1, pageSize: 100, q: query });
   const resources = useMemo(() => list.data?.items ?? [], [list.data?.items]);
   const labels = useMemo(
     () => new Map(resources.map((item) => [item.id, resourceLabel(item)])),
@@ -69,17 +69,13 @@ export function ReferencePicker({ name, labelKey, kind, selfId }: ReferencePicke
       </label>
       <div className="chip-row" aria-live="polite">
         {selectedIds.map((id) => (
-          <span className="chip" key={id}>
-            {labels.get(id) ?? id}
-            <button
-              className="chip-remove"
-              type="button"
-              aria-label={`${labels.get(id) ?? id} ${t("remove")}`}
-              onClick={() => removeReference(id)}
-            >
-              ×
-            </button>
-          </span>
+          <SelectedReferenceChip
+            id={id}
+            key={id}
+            kind={kind}
+            fallbackLabel={labels.get(id) ?? id}
+            onRemove={() => removeReference(id)}
+          />
         ))}
       </div>
       <div className="reference-option-list" role="listbox" aria-label={label}>
@@ -102,6 +98,35 @@ export function ReferencePicker({ name, labelKey, kind, selfId }: ReferencePicke
         {t("selectedCount")}: {selectedIds.length} {t("countSuffix")}
       </p>
     </fieldset>
+  );
+}
+
+function SelectedReferenceChip({
+  id,
+  kind,
+  fallbackLabel,
+  onRemove,
+}: {
+  id: string;
+  kind: ResourceKind;
+  fallbackLabel: string;
+  onRemove: () => void;
+}) {
+  const detail = useResourceDetail(kind, id);
+  const label = detail.data?.data ? resourceLabel(detail.data.data) : fallbackLabel;
+
+  return (
+    <span className="chip">
+      {label}
+      <button
+        className="chip-remove"
+        type="button"
+        aria-label={`${label} ${t("remove")}`}
+        onClick={onRemove}
+      >
+        ×
+      </button>
+    </span>
   );
 }
 

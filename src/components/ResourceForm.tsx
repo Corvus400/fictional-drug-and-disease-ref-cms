@@ -55,6 +55,13 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
     }) as unknown as Resolver<FormRecord>,
   });
   const save = useSaveResource(kind, initialValue?.id, etag);
+
+  useEffect(() => {
+    if (!form.formState.isDirty) {
+      form.reset(toDefaultValue(kind, initialValue) as FormRecord);
+    }
+  }, [form, form.formState.isDirty, initialValue, kind]);
+
   useBlocker({
     shouldBlockFn: () => form.formState.isDirty && !window.confirm(t("unsaved")),
   });
@@ -229,6 +236,8 @@ function DrugFields({ selfId }: { selfId?: string }) {
           labelKey="ageSpecificDosage"
           appendValue={{ range: { label: "" }, dose: "" }}
           fields={[
+            { name: "range.minAgeMonths", labelKey: "minAgeMonths", type: "number" },
+            { name: "range.maxAgeMonths", labelKey: "maxAgeMonths", type: "number" },
             { name: "range.label", labelKey: "rangeLabel" },
             { name: "dose", labelKey: "dose", type: "textarea" },
           ]}
@@ -238,6 +247,8 @@ function DrugFields({ selfId }: { selfId?: string }) {
           labelKey="renalAdjustment"
           appendValue={{ range: { severity: "normal", label: "" }, dose: "" }}
           fields={[
+            { name: "range.minMlPerMin", labelKey: "minMlPerMin", type: "number" },
+            { name: "range.maxMlPerMin", labelKey: "maxMlPerMin", type: "number" },
             { name: "range.label", labelKey: "rangeLabel" },
             {
               name: "range.severity",
@@ -463,6 +474,7 @@ function DiseaseFields({ selfId }: { selfId?: string }) {
 }
 
 const interactionFields = [
+  { name: "drugId", labelKey: "drugIds" },
   { name: "displayName", labelKey: "displayName" },
   { name: "clinicalSymptom", labelKey: "clinicalSymptom", type: "textarea" },
   { name: "mechanism", labelKey: "mechanism", type: "textarea" },
@@ -485,6 +497,7 @@ function NumberedParagraphEditor({
       appendValue={{ order: 1, content: "" }}
       fields={[
         { name: "order", labelKey: "order", type: "number" },
+        { name: "subOrder", labelKey: "subOrder", type: "number" },
         { name: "content", labelKey: "content", type: "textarea" },
       ]}
     />

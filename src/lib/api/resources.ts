@@ -43,6 +43,7 @@ export function useResourceDetail(kind: ResourceKind, id: string, enabled = true
   return useQuery({
     enabled,
     queryKey: [singular(kind), id],
+    refetchOnMount: "always",
     queryFn: async () => {
       const result = await getResource(kind, id);
       if (!result.ok) {
@@ -69,6 +70,17 @@ export function useSaveResource(kind: ResourceKind, id?: string, etag?: string) 
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [kind] });
       queryClient.invalidateQueries({ queryKey: [singular(kind), data.id] });
+    },
+    onError: (error) => {
+      if (
+        id !== undefined &&
+        typeof error === "object" &&
+        error !== null &&
+        "kind" in error &&
+        error.kind === "conflict"
+      ) {
+        queryClient.refetchQueries({ queryKey: [singular(kind), id], type: "active" });
+      }
     },
   });
 }
@@ -206,5 +218,5 @@ function toWireSort(value: string | undefined): string | undefined {
   if (value === undefined) {
     return undefined;
   }
-  return String(toWireValue(value));
+  return value.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
 }

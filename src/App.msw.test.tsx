@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -97,8 +97,15 @@ const server = setupServer(
 );
 
 describe("CMS mutation flows", () => {
+  let drugDetailRequests = 0;
+  let lastDrugListUrl = "";
+  let lastDiseaseListUrl = "";
+
   beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
   afterEach(() => {
+    drugDetailRequests = 0;
+    lastDrugListUrl = "";
+    lastDiseaseListUrl = "";
     server.resetHandlers();
     vi.unstubAllEnvs();
   });
@@ -113,6 +120,12 @@ describe("CMS mutation flows", () => {
   });
 
   it("shows a 412 conflict without navigating away from the edit form", async () => {
+    server.use(
+      http.get("http://127.0.0.1:19090/v1/drugs/drug_0001", () => {
+        drugDetailRequests += 1;
+        return HttpResponse.json(drugFixture, { headers: { ETag: '"v1"' } });
+      }),
+    );
     const user = userEvent.setup();
     render(<App />);
 
@@ -124,6 +137,7 @@ describe("CMS mutation flows", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "サーバ側で更新されました。最新を取得しました。差分を確認して再編集してください。",
     );
+    await waitFor(() => expect(drugDetailRequests).toBeGreaterThanOrEqual(2));
     expect(screen.getByDisplayValue("競合した販売名")).toBeInTheDocument();
   });
 
@@ -151,5 +165,94 @@ describe("CMS mutation flows", () => {
 
     expect(window.location.search).toContain("dosageForm=injection_form");
     expect(window.location.search).toContain("atcCode=B00");
+  });
+
+  it("keeps sort in the route search state and forwards it to the API query", async () => {
+    server.use(
+      http.get("http://127.0.0.1:19090/v1/drugs", ({ request }) => {
+        lastDrugListUrl = request.url;
+        return HttpResponse.json({
+          items: [],
+          page: 1,
+          pageSize: 20,
+          totalPages: 1,
+          totalCount: 0,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    window.history.pushState(null, "", "/drugs");
+
+    render(<App />);
+
+    await user.selectOptions(await screen.findByLabelText("並び順"), "brandName");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+
+    expect(window.location.search).toContain("sort=brandName");
+    await waitFor(() => expect(lastDrugListUrl).toContain("sort=brand_name"));
+  });
+
+  it("searches reference candidates through the API and resolves selected labels by id", async () => {
+    server.use(
+      http.get("http://127.0.0.1:19090/v1/diseases", ({ request }) => {
+        lastDiseaseListUrl = request.url;
+        return HttpResponse.json({
+          items: [{ id: "disease_0999", name: "遠隔候補疾患", icd10Chapter: "chapter_i" }],
+          page: 1,
+          pageSize: 100,
+          totalPages: 1,
+          totalCount: 1,
+        });
+      }),
+      http.get("http://127.0.0.1:19090/v1/diseases/disease_0001", () =>
+        HttpResponse.json({
+          id: "disease_0001",
+          name: "既存関連疾患",
+          nameKana: "キソンカンレンシッカン",
+          icd10Chapter: "chapter_i",
+          medicalDepartment: ["internal_medicine"],
+          chronicity: "acute",
+          infectious: true,
+          summary: "概要",
+          epidemiology: { riskFactors: ["接触"] },
+          etiology: "原因",
+          symptoms: { mainSymptoms: ["発熱"], onsetPattern: "acute" },
+          diagnosticCriteria: { required: ["検査"] },
+          requiredExams: [{ name: "血液検査", category: "blood_test", typicalFinding: "炎症" }],
+          treatments: { pharmacological: [], nonPharmacological: [], acutePhaseProtocol: [] },
+          prevention: ["予防"],
+          relatedDrugIds: [],
+          relatedDiseaseIds: [],
+        }),
+      ),
+      http.get("http://127.0.0.1:19090/v1/drugs/drug_0001", () =>
+        HttpResponse.json(
+          { ...drugFixture, relatedDiseaseIds: ["disease_0001"] },
+          { headers: { ETag: '"v1"' } },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    window.history.pushState(null, "", "/drugs/drug_0001/edit");
+
+    render(<App />);
+
+    const relatedDiseases = await screen.findByRole("group", { name: "関連疾患" });
+    expect(await within(relatedDiseases).findByText(/既存関連疾患/)).toBeInTheDocument();
+    await user.type(within(relatedDiseases).getByLabelText("検索"), "遠隔");
+
+    await waitFor(() => expect(lastDiseaseListUrl).toContain("keyword=%E9%81%A0%E9%9A%94"));
+    expect(
+      await within(relatedDiseases).findByRole("option", { name: /遠隔候補疾患/ }),
+    ).toBeVisible();
+  });
+
+  it("shows the drug image uploader on the edit screen only for drugs", async () => {
+    window.history.pushState(null, "", "/drugs/drug_0001/edit");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "画像" })).toBeInTheDocument();
+    expect(screen.getByLabelText("PNG を選択")).toBeInTheDocument();
   });
 });
