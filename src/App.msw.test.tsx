@@ -78,6 +78,9 @@ const server = setupServer(
   http.get("http://127.0.0.1:19090/v1/drugs/drug_0001", () =>
     HttpResponse.json(drugFixture, { headers: { ETag: '"v1"' } }),
   ),
+  http.get("http://127.0.0.1:19090/v1/diseases", () =>
+    HttpResponse.json({ items: [], page: 1, pageSize: 100, totalPages: 1, totalCount: 0 }),
+  ),
   http.patch("http://127.0.0.1:19090/v1/admin/drugs/drug_0001", () =>
     HttpResponse.json(
       {

@@ -1,7 +1,8 @@
+import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useBlocker } from "@tanstack/react-router";
 import { Save } from "lucide-react";
 import { useEffect } from "react";
-import { FormProvider, type Path, useForm, useFormContext } from "react-hook-form";
+import { FormProvider, type Path, type Resolver, useForm, useFormContext } from "react-hook-form";
 import { useSaveResource } from "@/lib/api/resources";
 import {
   chronicities,
@@ -18,7 +19,7 @@ import {
   regulatoryClasses,
   routeOfAdministration,
 } from "@/lib/api/schema";
-import { t } from "@/lib/i18n/messages";
+import { formatOption, type MessageKey, t } from "@/lib/i18n/messages";
 import { ErrorNotice } from "./ErrorNotice";
 import { FieldArrayEditor } from "./FieldArrayEditor";
 import { ReferencePicker } from "./ReferencePicker";
@@ -38,6 +39,9 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
   const form = useForm<FormRecord>({
     defaultValues: toDefaultValue(kind, initialValue) as FormRecord,
     mode: "onBlur",
+    resolver: standardSchemaResolver(schema as never, undefined, {
+      raw: true,
+    }) as unknown as Resolver<FormRecord>,
   });
   const save = useSaveResource(kind, initialValue?.id, etag);
   useBlocker({
@@ -57,18 +61,11 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
   }, [form.formState.isDirty]);
 
   function submit(value: FormRecord) {
-    const parsed = schema.safeParse(value);
-    if (!parsed.success) {
-      for (const issue of parsed.error.issues) {
-        form.setError(issue.path.join(".") as Path<FormRecord>, { message: issue.message });
-      }
-      return;
-    }
-    const patch = (buildDirtyPatch(parsed.data, form.formState.dirtyFields) ??
-      {}) as Partial<FormValue>;
+    const data = schema.parse(value) as FormValue;
+    const patch = (buildDirtyPatch(data, form.formState.dirtyFields) ?? {}) as Partial<FormValue>;
     save.mutate(
       {
-        data: parsed.data as FormValue,
+        data,
         patch,
       },
       {
@@ -146,58 +143,236 @@ function buildDirtyPatch(value: unknown, dirty: unknown): unknown {
 }
 
 function DrugFields({ selfId }: { selfId?: string }) {
+  const { watch } = useFormContext();
+  const dosageForm = watch("dosageForm");
+  const route = watch("routeOfAdministration");
+  const regulatoryClass = (watch("regulatoryClass") as string[] | undefined) ?? [];
+  const atcCode = String(watch("atcCode") ?? "");
+  const injectable = dosageForm === "injection_form" || route === "injection_route";
+  const external = [
+    "ointment",
+    "cream",
+    "patch",
+    "eye_drops",
+    "nasal_spray",
+    "suppository",
+  ].includes(String(dosageForm));
+  const needsWarning = regulatoryClass.some((item) =>
+    ["poison", "potent", "biological", "specified_biological"].includes(item),
+  );
+  const needsHandling = regulatoryClass.some((item) =>
+    ["biological", "specified_biological"].includes(item),
+  );
+  const needsInsurance = regulatoryClass.some((item) =>
+    ["narcotic", "psychotropic_1", "psychotropic_2", "psychotropic_3"].includes(item),
+  );
+  const needsDosageRelatedPrecaution = atcCode.startsWith("A") || atcCode.startsWith("C");
+
   return (
     <>
-      <Section title="基本情報">
-        <TextField name="brandName" label="販売名" required />
-        <TextField name="genericName" label="一般名" required />
-        <TextField name="brandNameKana" label="販売名カナ" required />
-        <TextField name="atcCode" label="ATC コード" required />
-        <TextField name="yjCode" label="日本標準商品分類番号" />
-        <TextField name="therapeuticCategoryName" label="薬効分類名" required />
-        <SelectField name="dosageForm" label="剤形" options={dosageForms} />
+      <Section titleKey="basicInfo">
+        <TextField name="brandName" labelKey="brandName" required />
+        <TextField name="genericName" labelKey="genericName" required />
+        <TextField name="brandNameKana" labelKey="brandNameKana" required />
+        <TextField name="atcCode" labelKey="atcCode" required />
+        <TextField name="yjCode" labelKey="yjCode" />
+        <TextField name="therapeuticCategoryName" labelKey="therapeuticCategoryName" required />
+        <SelectField name="dosageForm" labelKey="dosageForm" options={dosageForms} />
         <SelectField
           name="routeOfAdministration"
-          label="投与経路"
+          labelKey="routeOfAdministration"
           options={routeOfAdministration}
         />
-        <MultiSelectField name="regulatoryClass" label="規制区分" options={regulatoryClasses} />
-        <TextField name="manufacturer" label="製造販売業者" required />
+        <MultiSelectField
+          name="regulatoryClass"
+          labelKey="regulatoryClass"
+          options={regulatoryClasses}
+        />
+        <TextField name="manufacturer" labelKey="manufacturer" required />
       </Section>
-      <Section title="組成・用法">
-        <JsonField name="composition" label="組成・性状 JSON" />
-        <JsonField name="dosage" label="用法・用量 JSON" />
-        <JsonField name="dosageRelatedPrecautions" label="用法用量に関連する注意 JSON" />
-        <JsonField name="indications" label="効能・効果 JSON" />
-        <JsonField name="indicationsRelatedPrecautions" label="効能効果に関連する注意 JSON" />
+      <Section titleKey="drugCompositionDosage">
+        <TextField name="composition.activeIngredient" labelKey="activeIngredient" required />
+        <NumberField
+          name="composition.activeIngredientAmount.amount"
+          labelKey="activeIngredientAmount"
+          required
+        />
+        <SelectField
+          name="composition.activeIngredientAmount.unit"
+          labelKey="doseUnit"
+          options={["mg", "g", "microgram", "ml", "l", "iu", "meq", "mol", "mmol", "percent"]}
+        />
+        <TextField name="composition.activeIngredientAmount.per" labelKey="dosePer" />
+        <FieldArrayEditor name="composition.inactiveIngredients" labelKey="inactiveIngredients" />
+        <TextField name="composition.appearance" labelKey="appearance" required />
+        <TextField name="composition.identificationCode" labelKey="identificationCode" />
+        <TextAreaField name="dosage.standardDosage" labelKey="standardDosage" required />
+        <FieldArrayEditor
+          name="dosage.ageSpecificDosage"
+          labelKey="ageSpecificDosage"
+          appendValue={{ range: { label: "" }, dose: "" }}
+          fields={[
+            { name: "range.label", labelKey: "rangeLabel" },
+            { name: "dose", labelKey: "dose", type: "textarea" },
+          ]}
+        />
+        <FieldArrayEditor
+          name="dosage.renalAdjustment"
+          labelKey="renalAdjustment"
+          appendValue={{ range: { severity: "normal", label: "" }, dose: "" }}
+          fields={[
+            { name: "range.label", labelKey: "rangeLabel" },
+            {
+              name: "range.severity",
+              labelKey: "severity",
+              type: "select",
+              options: ["normal", "mild", "moderate", "severe", "end_stage"],
+            },
+            { name: "dose", labelKey: "dose", type: "textarea" },
+          ]}
+        />
+        <FieldArrayEditor
+          name="dosage.hepaticAdjustment"
+          labelKey="hepaticAdjustment"
+          appendValue={{ severity: "mild", dose: "" }}
+          fields={[
+            {
+              name: "severity",
+              labelKey: "severity",
+              type: "select",
+              options: ["mild", "moderate", "severe"],
+            },
+            { name: "dose", labelKey: "dose", type: "textarea" },
+          ]}
+        />
+        <NumberedParagraphEditor
+          name="dosageRelatedPrecautions"
+          labelKey="dosageRelatedPrecautions"
+          required={needsDosageRelatedPrecaution}
+        />
+        <IndicationEditor name="indications" labelKey="indications" required />
+        <NumberedParagraphEditor
+          name="indicationsRelatedPrecautions"
+          labelKey="indicationsRelatedPrecautions"
+        />
       </Section>
-      <Section title="安全性・注意">
-        <JsonField name="warning" label="警告 JSON" />
-        <JsonField name="contraindications" label="禁忌 JSON" />
-        <JsonField name="importantPrecautions" label="重要な基本的注意 JSON" />
-        <JsonField name="precautionsForSpecificPopulations" label="特定背景患者注意 JSON" />
-        <JsonField name="interactions" label="相互作用 JSON" />
-        <JsonField name="adverseReactions" label="副作用 JSON" />
-        <JsonField name="effectsOnLabTests" label="臨床検査結果に及ぼす影響 JSON" />
-        <JsonField name="overdose" label="過量投与 JSON" />
-        <JsonField name="administrationPrecautions" label="適用上の注意 JSON" />
-        <JsonField name="otherPrecautions" label="その他の注意 JSON" />
+      <Section titleKey="drugSafety">
+        <NumberedParagraphEditor name="warning" labelKey="warning" required={needsWarning} />
+        <NumberedParagraphEditor name="contraindications" labelKey="contraindications" required />
+        <NumberedParagraphEditor name="importantPrecautions" labelKey="importantPrecautions" />
+        <FieldArrayEditor
+          name="precautionsForSpecificPopulations"
+          labelKey="precautionsForSpecificPopulations"
+          appendValue={{ category: "comorbidity", note: "" }}
+          fields={[
+            {
+              name: "category",
+              labelKey: "category",
+              type: "select",
+              options: [
+                "comorbidity",
+                "renal_impairment",
+                "hepatic_impairment",
+                "reproductive_potential",
+                "pregnant",
+                "lactating",
+                "pediatric",
+                "geriatric",
+              ],
+            },
+            { name: "note", labelKey: "note", type: "textarea" },
+          ]}
+        />
+        <FieldArrayEditor
+          name="interactions.combinationProhibited"
+          labelKey="interactionsProhibited"
+          appendValue={{ displayName: "", clinicalSymptom: "", mechanism: "" }}
+          fields={interactionFields}
+        />
+        <FieldArrayEditor
+          name="interactions.combinationCaution"
+          labelKey="interactionsCaution"
+          appendValue={{ displayName: "", clinicalSymptom: "", mechanism: "" }}
+          fields={interactionFields}
+        />
+        <AdverseReactionFields />
+        <NumberedParagraphEditor name="effectsOnLabTests" labelKey="effectsOnLabTests" />
+        <TextAreaField name="overdose.symptoms" labelKey="overdoseSymptoms" />
+        <TextAreaField name="overdose.management" labelKey="overdoseManagement" />
+        <NumberedParagraphEditor
+          name="administrationPrecautions"
+          labelKey="administrationPrecautions"
+          required={injectable || external}
+        />
+        <NumberedParagraphEditor name="otherPrecautions" labelKey="otherPrecautions" />
       </Section>
-      <Section title="薬理・補助情報">
-        <JsonField name="pharmacokinetics" label="薬物動態 JSON" />
-        <JsonField name="clinicalResults" label="臨床成績 JSON" />
-        <JsonField name="pharmacology" label="薬効薬理 JSON" />
-        <JsonField name="physicochemicalProperties" label="理化学的知見 JSON" />
-        <JsonField name="handlingPrecautions" label="取扱い上の注意 JSON" />
-        <JsonField name="approvalConditions" label="承認条件 JSON" />
-        <JsonField name="packages" label="包装 JSON" />
-        <JsonField name="references" label="主要文献 JSON" />
-        <JsonField name="insuranceNotes" label="保険給付上の注意 JSON" />
+      <Section titleKey="drugSupplement">
+        {injectable ? (
+          <>
+            <TextAreaField
+              name="pharmacokinetics.bloodConcentration"
+              labelKey="bloodConcentration"
+              required
+            />
+            <TextAreaField name="pharmacokinetics.metabolism" labelKey="metabolism" />
+            <TextAreaField name="pharmacokinetics.excretion" labelKey="excretion" />
+          </>
+        ) : null}
+        <TextAreaField name="pharmacokinetics.absorption" labelKey="absorption" />
+        <TextAreaField name="pharmacokinetics.distribution" labelKey="distribution" />
+        <FieldArrayEditor
+          name="pharmacokinetics.parameters"
+          labelKey="pkParameters"
+          appendValue={{ name: "", value: "" }}
+          fields={[
+            { name: "name", labelKey: "parameterName" },
+            { name: "value", labelKey: "parameterValue" },
+          ]}
+        />
+        <FieldArrayEditor
+          name="clinicalResults"
+          labelKey="clinicalResults"
+          appendValue={{ heading: "", content: "" }}
+          fields={[
+            { name: "heading", labelKey: "heading" },
+            { name: "content", labelKey: "content", type: "textarea" },
+          ]}
+        />
+        <TextAreaField name="pharmacology.mechanism" labelKey="pharmacologyMechanism" />
+        <TextAreaField name="pharmacology.effect" labelKey="pharmacologyEffect" />
+        <TextField
+          name="physicochemicalProperties.genericNameEnglish"
+          labelKey="genericNameEnglish"
+        />
+        <TextField name="physicochemicalProperties.molecularFormula" labelKey="molecularFormula" />
+        <NumberField name="physicochemicalProperties.molecularWeight" labelKey="molecularWeight" />
+        <TextAreaField name="physicochemicalProperties.description" labelKey="description" />
+        <NumberedParagraphEditor
+          name="handlingPrecautions"
+          labelKey="handlingPrecautions"
+          required={needsHandling}
+        />
+        <NumberedParagraphEditor name="approvalConditions" labelKey="approvalConditions" />
+        <PackageEditor />
+        <FieldArrayEditor
+          name="references"
+          labelKey="references"
+          appendValue={{ citation: "", source: "" }}
+          fields={[
+            { name: "citation", labelKey: "citation" },
+            { name: "source", labelKey: "source" },
+          ]}
+        />
+        <NumberedParagraphEditor
+          name="insuranceNotes"
+          labelKey="insuranceNotes"
+          required={needsInsurance}
+        />
       </Section>
-      <Section title="関連リソース">
+      <Section titleKey="relatedResources">
         <ReferencePicker
           name="relatedDiseaseIds"
-          label="関連疾患"
+          labelKey="relatedDiseases"
           kind="diseases"
           selfId={selfId}
         />
@@ -207,37 +382,61 @@ function DrugFields({ selfId }: { selfId?: string }) {
 }
 
 function DiseaseFields({ selfId }: { selfId?: string }) {
+  const { watch } = useFormContext();
+  const icd10Chapter = watch("icd10Chapter");
+  const chronicity = watch("chronicity");
+  const infectious = watch("infectious");
+  const needsEpidemiology = icd10Chapter === "chapter_i" || icd10Chapter === "chapter_xv";
+  const needsSeverity = icd10Chapter === "chapter_ii" || icd10Chapter === "chapter_ix";
+  const needsPrognosis = icd10Chapter === "chapter_ii";
+  const needsAcuteProtocol = icd10Chapter === "chapter_ix" && chronicity === "acute";
+  const needsPrevention = infectious === true;
+
   return (
     <>
-      <Section title="基本情報">
-        <TextField name="name" label="疾患名" required />
-        <TextField name="nameKana" label="疾患名カナ" required />
-        <TextField name="nameEnglish" label="英語名" />
-        <SelectField name="icd10Chapter" label="ICD-10 章" options={icd10Chapters} />
-        <SelectField name="chronicity" label="慢性度" options={chronicities} />
-        <CheckboxField name="infectious" label="感染性" />
-        <MultiSelectField name="medicalDepartment" label="診療科" options={medicalDepartments} />
-        <FieldArrayEditor name="synonyms" label="別名・同義語" />
+      <Section titleKey="basicInfo">
+        <TextField name="name" labelKey="diseaseName" required />
+        <TextField name="nameKana" labelKey="diseaseNameKana" required />
+        <TextField name="nameEnglish" labelKey="diseaseNameEnglish" />
+        <SelectField name="icd10Chapter" labelKey="icd10Chapter" options={icd10Chapters} />
+        <SelectField name="chronicity" labelKey="chronicity" options={chronicities} />
+        <CheckboxField name="infectious" labelKey="infectious" />
+        <MultiSelectField
+          name="medicalDepartment"
+          labelKey="medicalDepartment"
+          options={medicalDepartments}
+        />
+        <FieldArrayEditor name="synonyms" labelKey="synonyms" />
       </Section>
-      <Section title="疾患情報">
-        <TextAreaField name="summary" label="概説" required />
-        <TextAreaField name="etiology" label="原因・病態" required />
-        <JsonField name="epidemiology" label="疫学 JSON" />
-        <JsonField name="symptoms" label="症状 JSON" />
-        <JsonField name="diagnosticCriteria" label="診断基準 JSON" />
-        <JsonField name="requiredExams" label="必須検査 JSON" />
-        <JsonField name="severityGrading" label="重症度分類 JSON" />
-        <FieldArrayEditor name="differentialDiagnoses" label="鑑別診断" />
-        <FieldArrayEditor name="complications" label="合併症" />
-        <JsonField name="treatments" label="治療 JSON" />
-        <TextAreaField name="prognosis" label="予後" />
-        <FieldArrayEditor name="prevention" label="予防" />
+      <Section titleKey="diseaseInfo">
+        <TextAreaField name="summary" labelKey="summary" required />
+        <TextAreaField name="etiology" labelKey="etiology" required />
+        {needsEpidemiology ? <EpidemiologyFields required /> : <EpidemiologyFields />}
+        <FieldArrayEditor name="symptoms.mainSymptoms" labelKey="mainSymptoms" required />
+        <FieldArrayEditor name="symptoms.associatedSymptoms" labelKey="associatedSymptoms" />
+        {icd10Chapter === "chapter_i" ? (
+          <SelectField
+            name="symptoms.onsetPattern"
+            labelKey="onsetPattern"
+            options={["acute", "subacute", "chronic", "intermittent", "relapsing"]}
+          />
+        ) : null}
+        <FieldArrayEditor name="diagnosticCriteria.required" labelKey="requiredCriteria" required />
+        <FieldArrayEditor name="diagnosticCriteria.supporting" labelKey="supportingCriteria" />
+        <TextAreaField name="diagnosticCriteria.notes" labelKey="criteriaNotes" />
+        <ExamEditor />
+        {needsSeverity ? <SeverityEditor required /> : <SeverityEditor />}
+        <FieldArrayEditor name="differentialDiagnoses" labelKey="differentialDiagnoses" />
+        <FieldArrayEditor name="complications" labelKey="complications" />
+        <TreatmentFields needsAcuteProtocol={needsAcuteProtocol} />
+        <TextAreaField name="prognosis" labelKey="prognosis" required={needsPrognosis} />
+        <FieldArrayEditor name="prevention" labelKey="prevention" required={needsPrevention} />
       </Section>
-      <Section title="関連リソース">
-        <ReferencePicker name="relatedDrugIds" label="関連医薬品" kind="drugs" />
+      <Section titleKey="relatedResources">
+        <ReferencePicker name="relatedDrugIds" labelKey="relatedDrugs" kind="drugs" />
         <ReferencePicker
           name="relatedDiseaseIds"
-          label="関連疾患"
+          labelKey="relatedDiseases"
           kind="diseases"
           selfId={selfId}
         />
@@ -246,26 +445,275 @@ function DiseaseFields({ selfId }: { selfId?: string }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+const interactionFields = [
+  { name: "displayName", labelKey: "displayName" },
+  { name: "clinicalSymptom", labelKey: "clinicalSymptom", type: "textarea" },
+  { name: "mechanism", labelKey: "mechanism", type: "textarea" },
+] satisfies React.ComponentProps<typeof FieldArrayEditor>["fields"];
+
+function NumberedParagraphEditor({
+  name,
+  labelKey,
+  required = false,
+}: {
+  name: string;
+  labelKey: MessageKey;
+  required?: boolean;
+}) {
+  return (
+    <FieldArrayEditor
+      name={name}
+      labelKey={labelKey}
+      required={required}
+      appendValue={{ order: 1, content: "" }}
+      fields={[
+        { name: "order", labelKey: "order", type: "number" },
+        { name: "content", labelKey: "content", type: "textarea" },
+      ]}
+    />
+  );
+}
+
+function IndicationEditor({
+  name,
+  labelKey,
+  required = false,
+}: {
+  name: string;
+  labelKey: MessageKey;
+  required?: boolean;
+}) {
+  return (
+    <FieldArrayEditor
+      name={name}
+      labelKey={labelKey}
+      required={required}
+      appendValue={{ order: 1, content: "" }}
+      fields={[
+        { name: "order", labelKey: "order", type: "number" },
+        { name: "content", labelKey: "content", type: "textarea" },
+      ]}
+    />
+  );
+}
+
+function AdverseReactionFields() {
+  return (
+    <>
+      <FieldArrayEditor
+        name="adverseReactions.serious"
+        labelKey="seriousAdverseReactions"
+        appendValue={{
+          name: "",
+          frequency: "unknown",
+          symptom: "",
+          initialSigns: "",
+          countermeasure: "",
+        }}
+        fields={[
+          { name: "name", labelKey: "adverseReactionName" },
+          {
+            name: "frequency",
+            labelKey: "frequency",
+            type: "select",
+            options: ["over_5_percent", "between_1_and_5_percent", "under_1_percent", "unknown"],
+          },
+          { name: "symptom", labelKey: "symptom", type: "textarea" },
+          { name: "initialSigns", labelKey: "initialSigns" },
+          { name: "countermeasure", labelKey: "countermeasure", type: "textarea" },
+        ]}
+      />
+      <FieldArrayEditor name="adverseReactions.other.over5Percent" labelKey="adverseOver5" />
+      <FieldArrayEditor
+        name="adverseReactions.other.between1And5Percent"
+        labelKey="adverseBetween1And5"
+      />
+      <FieldArrayEditor name="adverseReactions.other.under1Percent" labelKey="adverseUnder1" />
+      <FieldArrayEditor name="adverseReactions.other.frequencyUnknown" labelKey="adverseUnknown" />
+    </>
+  );
+}
+
+function PackageEditor() {
+  return (
+    <FieldArrayEditor
+      name="packages"
+      labelKey="packages"
+      required
+      appendValue={{
+        size: "",
+        storageCondition: {
+          temperature: "room_temperature",
+          lightProtection: false,
+          moistureProtection: false,
+          additionalNote: "",
+        },
+        expirationMonths: 36,
+      }}
+      fields={[
+        { name: "size", labelKey: "packageSize" },
+        {
+          name: "storageCondition.temperature",
+          labelKey: "storageTemperature",
+          type: "select",
+          options: ["room_temperature", "cold", "frozen"],
+        },
+        { name: "storageCondition.lightProtection", labelKey: "lightProtection", type: "checkbox" },
+        {
+          name: "storageCondition.moistureProtection",
+          labelKey: "moistureProtection",
+          type: "checkbox",
+        },
+        { name: "storageCondition.additionalNote", labelKey: "storageAdditionalNote" },
+        { name: "expirationMonths", labelKey: "expirationMonths", type: "number" },
+      ]}
+    />
+  );
+}
+
+function EpidemiologyFields({ required = false }: { required?: boolean }) {
+  return (
+    <fieldset className="field-group field-wide">
+      <legend>
+        {t("epidemiology")}{" "}
+        <span className="field-hint">{required ? t("required") : t("optional")}</span>
+      </legend>
+      <NumberField name="epidemiology.prevalence.rate" labelKey="prevalenceRate" />
+      <NumberField name="epidemiology.prevalence.denominator" labelKey="prevalenceDenominator" />
+      <SelectField
+        name="epidemiology.prevalence.unit"
+        labelKey="prevalenceUnit"
+        options={["per_population", "per_patient", "per_birth"]}
+      />
+      <TextField name="epidemiology.prevalence.label" labelKey="prevalence" />
+      <NumberField name="epidemiology.onsetAgeRange.minAgeYears" labelKey="minAgeYears" />
+      <NumberField name="epidemiology.onsetAgeRange.maxAgeYears" labelKey="maxAgeYears" />
+      <TextField name="epidemiology.onsetAgeRange.label" labelKey="onsetAgeRange" />
+      <NumberField name="epidemiology.sexRatio.maleRatio" labelKey="maleRatio" />
+      <NumberField name="epidemiology.sexRatio.femaleRatio" labelKey="femaleRatio" />
+      <TextField name="epidemiology.sexRatio.note" labelKey="note" />
+      <FieldArrayEditor
+        name="epidemiology.riskFactors"
+        labelKey="riskFactors"
+        required={required}
+      />
+    </fieldset>
+  );
+}
+
+function ExamEditor() {
+  return (
+    <FieldArrayEditor
+      name="requiredExams"
+      labelKey="requiredExams"
+      required
+      appendValue={{ name: "", category: "blood_test", typicalFinding: "", referenceRange: "" }}
+      fields={[
+        { name: "name", labelKey: "examName" },
+        {
+          name: "category",
+          labelKey: "examCategory",
+          type: "select",
+          options: ["blood_test", "imaging", "physiological", "pathology", "interview"],
+        },
+        { name: "typicalFinding", labelKey: "typicalFinding" },
+        { name: "referenceRange", labelKey: "referenceRange" },
+      ]}
+    />
+  );
+}
+
+function SeverityEditor({ required = false }: { required?: boolean }) {
+  return (
+    <fieldset className="field-group field-wide">
+      <legend>
+        {t("severityGrading")}{" "}
+        <span className="field-hint">{required ? t("required") : t("optional")}</span>
+      </legend>
+      <TextField
+        name="severityGrading.gradingSystem"
+        labelKey="gradingSystem"
+        required={required}
+      />
+      <FieldArrayEditor
+        name="severityGrading.grades"
+        labelKey="grades"
+        required={required}
+        appendValue={{ label: "", criteria: "", recommendedAction: "" }}
+        fields={[
+          { name: "label", labelKey: "gradeLabel" },
+          { name: "criteria", labelKey: "gradeCriteria" },
+          { name: "recommendedAction", labelKey: "recommendedAction", type: "textarea" },
+        ]}
+      />
+    </fieldset>
+  );
+}
+
+function TreatmentFields({ needsAcuteProtocol }: { needsAcuteProtocol: boolean }) {
+  return (
+    <fieldset className="field-group field-wide">
+      <legend>{t("treatments")}</legend>
+      <FieldArrayEditor
+        name="treatments.pharmacological"
+        labelKey="pharmacologicalTreatments"
+        appendValue={{ drugCategory: "", drugIds: [], indication: "", notes: "" }}
+        fields={[
+          { name: "drugCategory", labelKey: "drugCategory" },
+          { name: "indication", labelKey: "indication" },
+          { name: "notes", labelKey: "treatmentNotes", type: "textarea" },
+        ]}
+      />
+      <FieldArrayEditor
+        name="treatments.nonPharmacological"
+        labelKey="nonPharmacologicalTreatments"
+        appendValue={{ heading: "", items: [], description: "" }}
+        fields={[
+          { name: "heading", labelKey: "heading" },
+          { name: "description", labelKey: "treatmentDescription", type: "textarea" },
+        ]}
+      />
+      <FieldArrayEditor
+        name="treatments.acutePhaseProtocol"
+        labelKey="acutePhaseProtocol"
+        required={needsAcuteProtocol}
+        appendValue={{ order: 1, action: "", target: "" }}
+        fields={[
+          { name: "order", labelKey: "order", type: "number" },
+          { name: "action", labelKey: "action", type: "textarea" },
+          { name: "target", labelKey: "target" },
+        ]}
+      />
+    </fieldset>
+  );
+}
+
+function Section({ titleKey, children }: { titleKey: MessageKey; children: React.ReactNode }) {
   return (
     <section className="section-panel">
-      <h2>{title}</h2>
+      <h2>{t(titleKey)}</h2>
       <div className="field-grid">{children}</div>
     </section>
   );
 }
 
-function TextField({ name, label, required = false }: FieldProps) {
+function TextField({ name, labelKey, required = false, type = "text" }: FieldProps) {
   const { formState, register } = useFormContext();
-  const error = formState.errors[name];
+  const error = getFieldError(formState.errors, name);
+  const label = t(labelKey);
+  const registerOptions =
+    type === "number"
+      ? { setValueAs: (value: unknown) => (value === "" ? undefined : Number(value)) }
+      : undefined;
   return (
     <label className="field">
       <span>
         {label} <span className="field-hint">{required ? t("required") : t("optional")}</span>
       </span>
       <input
+        type={type}
         className="input"
-        {...register(name)}
+        {...register(name, registerOptions)}
         aria-invalid={error === undefined ? undefined : true}
       />
       <FieldError name={name} />
@@ -273,8 +721,13 @@ function TextField({ name, label, required = false }: FieldProps) {
   );
 }
 
-function TextAreaField({ name, label, required = false }: FieldProps) {
+function NumberField(props: FieldProps) {
+  return <TextField {...props} type="number" />;
+}
+
+function TextAreaField({ name, labelKey, required = false }: FieldProps) {
   const { register } = useFormContext();
+  const label = t(labelKey);
   return (
     <label className="field field-wide">
       <span>
@@ -286,32 +739,9 @@ function TextAreaField({ name, label, required = false }: FieldProps) {
   );
 }
 
-function JsonField({ name, label }: FieldProps) {
-  const { setValue, watch } = useFormContext();
-  return (
-    <label className="field field-wide">
-      <span>
-        {label} <span className="field-hint">{t("optional")}</span>
-      </span>
-      <textarea
-        className="input textarea monospace"
-        defaultValue={JSON.stringify(watch(name) ?? {}, null, 2)}
-        onBlur={(event) => {
-          try {
-            setValue(name, JSON.parse(event.currentTarget.value), { shouldDirty: true });
-          } catch {
-            setValue(name, {}, { shouldDirty: true });
-          }
-        }}
-        name={`${name}.__json`}
-      />
-      <FieldError name={name} />
-    </label>
-  );
-}
-
-function SelectField({ name, label, options }: FieldProps & { options: readonly string[] }) {
+function SelectField({ name, labelKey, options }: FieldProps & { options: readonly string[] }) {
   const { register } = useFormContext();
+  const label = t(labelKey);
   return (
     <label className="field">
       <span>
@@ -320,7 +750,7 @@ function SelectField({ name, label, options }: FieldProps & { options: readonly 
       <select className="input" {...register(name)}>
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {formatOption(option)}
           </option>
         ))}
       </select>
@@ -329,8 +759,13 @@ function SelectField({ name, label, options }: FieldProps & { options: readonly 
   );
 }
 
-function MultiSelectField({ name, label, options }: FieldProps & { options: readonly string[] }) {
+function MultiSelectField({
+  name,
+  labelKey,
+  options,
+}: FieldProps & { options: readonly string[] }) {
   const { register } = useFormContext();
+  const label = t(labelKey);
   return (
     <label className="field">
       <span>
@@ -339,7 +774,7 @@ function MultiSelectField({ name, label, options }: FieldProps & { options: read
       <select className="input multi" multiple {...register(name)}>
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {formatOption(option)}
           </option>
         ))}
       </select>
@@ -348,19 +783,19 @@ function MultiSelectField({ name, label, options }: FieldProps & { options: read
   );
 }
 
-function CheckboxField({ name, label }: FieldProps) {
+function CheckboxField({ name, labelKey }: FieldProps) {
   const { register } = useFormContext();
   return (
     <label className="checkbox-field">
       <input type="checkbox" {...register(name)} />
-      {label}
+      {t(labelKey)}
     </label>
   );
 }
 
 function FieldError({ name }: { name: string }) {
   const { formState } = useFormContext();
-  const error = formState.errors[name];
+  const error = getFieldError(formState.errors, name);
   return error?.message !== undefined ? (
     <span className="field-error" role="alert">
       {String(error.message)}
@@ -368,10 +803,24 @@ function FieldError({ name }: { name: string }) {
   ) : null;
 }
 
+function getFieldError(errors: unknown, name: string): { message?: unknown } | undefined {
+  let current = errors;
+  for (const segment of name.split(".")) {
+    if (typeof current !== "object" || current === null) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return typeof current === "object" && current !== null
+    ? (current as { message?: unknown })
+    : undefined;
+}
+
 type FieldProps = {
   name: string;
-  label: string;
+  labelKey: MessageKey;
   required?: boolean;
+  type?: "text" | "number";
 };
 
 function toDefaultValue(kind: ResourceKind, value?: Drug | Disease): Partial<FormValue> {

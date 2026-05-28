@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { t } from "@/lib/i18n/messages";
 
 export const dosageForms = [
   "tablet",
@@ -112,6 +113,26 @@ const nonEmptyString = z.string().trim().min(1);
 const optionalString = z.string().optional().or(z.literal(""));
 const stringArray = z.array(z.string().trim()).default([]);
 const nonEmptyStringArray = z.array(nonEmptyString).min(1);
+
+function isEmptyFormValue(value: unknown): boolean {
+  if (value === null || value === undefined || value === "") {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.length === 0 || value.every(isEmptyFormValue);
+  }
+  if (typeof value === "object") {
+    return Object.values(value).every(isEmptyFormValue);
+  }
+  return false;
+}
+
+function blankObjectToNull<T extends z.ZodType>(schema: T) {
+  return z.preprocess(
+    (value) => (isEmptyFormValue(value) ? null : value),
+    schema.nullable().optional(),
+  );
+}
 
 const numberedParagraphSchema = z.object({
   order: z.coerce.number().int().positive(),
@@ -230,31 +251,40 @@ const examSchema = z.object({
 });
 
 const epidemiologySchema = z.object({
-  prevalence: z
-    .object({
-      rate: z.coerce.number().nullable().optional(),
-      denominator: z.coerce.number().int().nullable().optional(),
-      unit: z.enum(prevalenceUnits).default("per_population"),
-      label: nonEmptyString,
-    })
-    .nullable()
-    .optional(),
-  onsetAgeRange: z
-    .object({
-      minAgeYears: z.coerce.number().int().nullable().optional(),
-      maxAgeYears: z.coerce.number().int().nullable().optional(),
-      label: nonEmptyString,
-    })
-    .nullable()
-    .optional(),
-  sexRatio: z
-    .object({
-      maleRatio: z.coerce.number().int(),
-      femaleRatio: z.coerce.number().int(),
-      note: optionalString,
-    })
-    .nullable()
-    .optional(),
+  prevalence: z.preprocess(
+    (value) => (isEmptyFormValue(value) ? null : value),
+    z
+      .object({
+        rate: z.coerce.number().nullable().optional(),
+        denominator: z.coerce.number().int().nullable().optional(),
+        unit: z.enum(prevalenceUnits).default("per_population"),
+        label: nonEmptyString,
+      })
+      .nullable()
+      .optional(),
+  ),
+  onsetAgeRange: z.preprocess(
+    (value) => (isEmptyFormValue(value) ? null : value),
+    z
+      .object({
+        minAgeYears: z.coerce.number().int().nullable().optional(),
+        maxAgeYears: z.coerce.number().int().nullable().optional(),
+        label: nonEmptyString,
+      })
+      .nullable()
+      .optional(),
+  ),
+  sexRatio: z.preprocess(
+    (value) => (isEmptyFormValue(value) ? null : value),
+    z
+      .object({
+        maleRatio: z.coerce.number().int(),
+        femaleRatio: z.coerce.number().int(),
+        note: optionalString,
+      })
+      .nullable()
+      .optional(),
+  ),
   riskFactors: stringArray,
 });
 
@@ -337,29 +367,24 @@ export const drugRequestSchema = z
     interactions: interactionSchema.nullable().optional(),
     adverseReactions: adverseReactionsSchema,
     effectsOnLabTests: z.array(numberedParagraphSchema).default([]),
-    overdose: z
-      .object({ symptoms: nonEmptyString, management: nonEmptyString })
-      .nullable()
-      .optional(),
+    overdose: blankObjectToNull(z.object({ symptoms: nonEmptyString, management: nonEmptyString })),
     administrationPrecautions: z.array(numberedParagraphSchema).default([]),
     otherPrecautions: z.array(numberedParagraphSchema).default([]),
     pharmacokinetics: pharmacokineticsSchema.nullable().optional(),
     clinicalResults: z
       .array(z.object({ heading: nonEmptyString, content: nonEmptyString }))
       .default([]),
-    pharmacology: z
-      .object({ mechanism: nonEmptyString, effect: nonEmptyString })
-      .nullable()
-      .optional(),
-    physicochemicalProperties: z
-      .object({
+    pharmacology: blankObjectToNull(
+      z.object({ mechanism: nonEmptyString, effect: nonEmptyString }),
+    ),
+    physicochemicalProperties: blankObjectToNull(
+      z.object({
         genericNameEnglish: nonEmptyString,
         molecularFormula: nonEmptyString,
         molecularWeight: z.coerce.number().nullable().optional(),
         description: nonEmptyString,
-      })
-      .nullable()
-      .optional(),
+      }),
+    ),
     handlingPrecautions: z.array(numberedParagraphSchema).default([]),
     approvalConditions: z.array(numberedParagraphSchema).default([]),
     packages: z.array(packageSchema).min(1),
@@ -386,7 +411,7 @@ export const drugRequestSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["administrationPrecautions"],
-        message: "この剤形または投与経路では適用上の注意が必要です。",
+        message: t("validationAdministrationPrecaution"),
       });
     }
     if (injectable) {
@@ -394,21 +419,21 @@ export const drugRequestSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["pharmacokinetics"],
-          message: "注射剤は薬物動態が必要です。",
+          message: t("validationInjectionPharmacokinetics"),
         });
       } else {
         if (!value.pharmacokinetics.bloodConcentration) {
           ctx.addIssue({
             code: "custom",
             path: ["pharmacokinetics", "bloodConcentration"],
-            message: "注射剤は血中濃度情報が必要です。",
+            message: t("validationBloodConcentration"),
           });
         }
         if (!value.pharmacokinetics.metabolism && !value.pharmacokinetics.excretion) {
           ctx.addIssue({
             code: "custom",
             path: ["pharmacokinetics", "metabolism"],
-            message: "注射剤は代謝または排泄情報が必要です。",
+            message: t("validationMetabolismOrExcretion"),
           });
         }
       }
@@ -417,24 +442,24 @@ export const drugRequestSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["handlingPrecautions"],
-        message: "生物由来製品は取扱い上の注意が必要です。",
+        message: t("validationBiologicalHandling"),
       });
     }
     if ((biological || hazardous) && value.warning.length === 0) {
-      ctx.addIssue({ code: "custom", path: ["warning"], message: "警告が必要です。" });
+      ctx.addIssue({ code: "custom", path: ["warning"], message: t("validationWarningRequired") });
     }
     if (controlled && value.insuranceNotes.length === 0) {
       ctx.addIssue({
         code: "custom",
         path: ["insuranceNotes"],
-        message: "麻薬・向精神薬は保険給付上の注意が必要です。",
+        message: t("validationControlledInsurance"),
       });
     }
     if (chronicLongTerm && value.dosageRelatedPrecautions.length === 0) {
       ctx.addIssue({
         code: "custom",
         path: ["dosageRelatedPrecautions"],
-        message: "A/C 群薬剤は用法用量に関連する注意が必要です。",
+        message: t("validationLongTermDosage"),
       });
     }
   });
@@ -450,7 +475,7 @@ export const diseaseRequestSchema = z
     infectious: z.boolean(),
     synonyms: stringArray,
     summary: nonEmptyString,
-    epidemiology: epidemiologySchema.nullable().optional(),
+    epidemiology: blankObjectToNull(epidemiologySchema),
     etiology: nonEmptyString,
     symptoms: symptomsSchema,
     diagnosticCriteria: diagnosticCriteriaSchema,
@@ -470,25 +495,29 @@ export const diseaseRequestSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["infectious"],
-          message: "ICD-10 第 I 章は感染性を true にしてください。",
+          message: t("validationInfectiousTrue"),
         });
       }
       if (value.epidemiology == null) {
         ctx.addIssue({
           code: "custom",
           path: ["epidemiology"],
-          message: "感染症は疫学情報が必要です。",
+          message: t("validationInfectiousEpidemiology"),
         });
       }
       if (!value.symptoms.onsetPattern) {
         ctx.addIssue({
           code: "custom",
           path: ["symptoms", "onsetPattern"],
-          message: "感染症は発症様式が必要です。",
+          message: t("validationInfectiousOnset"),
         });
       }
       if (value.prevention.length === 0) {
-        ctx.addIssue({ code: "custom", path: ["prevention"], message: "感染症は予防が必要です。" });
+        ctx.addIssue({
+          code: "custom",
+          path: ["prevention"],
+          message: t("validationInfectiousPrevention"),
+        });
       }
     }
     if (value.icd10Chapter === "chapter_ii") {
@@ -496,25 +525,29 @@ export const diseaseRequestSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["severityGrading"],
-          message: "重症度分類が必要です。",
+          message: t("validationSeverityRequired"),
         });
       }
       if (!value.prognosis) {
-        ctx.addIssue({ code: "custom", path: ["prognosis"], message: "予後が必要です。" });
+        ctx.addIssue({
+          code: "custom",
+          path: ["prognosis"],
+          message: t("validationPrognosisRequired"),
+        });
       }
     }
     if (value.icd10Chapter === "chapter_iv" && value.treatments.pharmacological.length === 0) {
       ctx.addIssue({
         code: "custom",
         path: ["treatments", "pharmacological"],
-        message: "内分泌代謝疾患は薬物療法が必要です。",
+        message: t("validationEndocrineTreatment"),
       });
     }
     if (value.icd10Chapter === "chapter_v" && value.symptoms.mainSymptoms.length < 3) {
       ctx.addIssue({
         code: "custom",
         path: ["symptoms", "mainSymptoms"],
-        message: "第 V 章は主症状を 3 件以上入力してください。",
+        message: t("validationChapterVSymptoms"),
       });
     }
     if (value.icd10Chapter === "chapter_ix") {
@@ -522,40 +555,44 @@ export const diseaseRequestSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["severityGrading"],
-          message: "重症度分類が必要です。",
+          message: t("validationSeverityRequired"),
         });
       }
       if (!value.requiredExams.some((exam) => exam.category === "imaging")) {
         ctx.addIssue({
           code: "custom",
           path: ["requiredExams"],
-          message: "循環器系疾患は画像検査が必要です。",
+          message: t("validationCardiologyImaging"),
         });
       }
       if (value.chronicity === "acute" && value.treatments.acutePhaseProtocol.length === 0) {
         ctx.addIssue({
           code: "custom",
           path: ["treatments", "acutePhaseProtocol"],
-          message: "急性循環器系疾患は急性期対応が必要です。",
+          message: t("validationAcuteProtocol"),
         });
       }
     }
     if (value.icd10Chapter === "chapter_xv") {
       if (value.epidemiology == null) {
-        ctx.addIssue({ code: "custom", path: ["epidemiology"], message: "疫学情報が必要です。" });
+        ctx.addIssue({
+          code: "custom",
+          path: ["epidemiology"],
+          message: t("validationEpidemiologyRequired"),
+        });
       } else {
         if (value.epidemiology.onsetAgeRange == null) {
           ctx.addIssue({
             code: "custom",
             path: ["epidemiology", "onsetAgeRange"],
-            message: "好発年齢が必要です。",
+            message: t("validationOnsetAgeRequired"),
           });
         }
         if (value.epidemiology.sexRatio == null) {
           ctx.addIssue({
             code: "custom",
             path: ["epidemiology", "sexRatio"],
-            message: "男女比が必要です。",
+            message: t("validationSexRatioRequired"),
           });
         }
       }

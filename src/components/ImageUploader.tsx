@@ -17,15 +17,15 @@ export function ImageUploader({ drugId, imageUrl }: ImageUploaderProps) {
 
   return (
     <section className="section-panel" aria-labelledby="image-upload-title">
-      <h2 id="image-upload-title">画像</h2>
+      <h2 id="image-upload-title">{t("image")}</h2>
       {(previewUrl ?? imageUrl) ? (
-        <img className="resource-image" src={previewUrl ?? imageUrl} alt="医薬品画像プレビュー" />
+        <img className="resource-image" src={previewUrl ?? imageUrl} alt={t("imageAlt")} />
       ) : (
-        <p className="muted">画像は未設定です。</p>
+        <p className="muted">{t("imageUnset")}</p>
       )}
       <label className="file-input">
         <Upload aria-hidden="true" size={16} />
-        PNG を選択
+        {t("selectPng")}
         <input
           accept="image/png"
           type="file"

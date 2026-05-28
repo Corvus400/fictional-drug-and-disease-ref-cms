@@ -1,0 +1,9 @@
+[allowlist]
+description = "CMS domain false positives"
+paths = [
+  '''^dist/''',
+]
+
+regexes = [
+  '''icd10Chapter''',
+]

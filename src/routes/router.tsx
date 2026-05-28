@@ -138,11 +138,11 @@ function RootLayout() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <p className="eyebrow">Local Admin</p>
+        <p className="eyebrow">{t("localAdmin")}</p>
         <Link className="brand" to="/drugs" search={defaultSearch}>
           {t("appTitle")}
         </Link>
-        <nav aria-label="リソース">
+        <nav aria-label={t("resourceNavigation")}>
           <Link
             activeProps={{ className: "nav-link active" }}
             className="nav-link"
@@ -224,9 +224,9 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>名称</th>
-                  <th>分類</th>
-                  <th>操作</th>
+                  <th>{t("name")}</th>
+                  <th>{t("category")}</th>
+                  <th>{t("actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -307,8 +307,8 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
       <ConfirmDialog
         open={confirming}
         pending={remove.isPending}
-        title={`${data.id} を削除`}
-        description="この操作は取り消せません。参照されている場合はサーバが拒否します。"
+        title={`${data.id} ${t("deleteTitle")}`}
+        description={t("deleteDescription")}
         onCancel={() => setConfirming(false)}
         onConfirm={() =>
           remove.mutate(undefined, {
