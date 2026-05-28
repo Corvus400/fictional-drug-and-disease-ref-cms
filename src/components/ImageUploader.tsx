@@ -1,5 +1,6 @@
 import { Upload } from "lucide-react";
 import { useState } from "react";
+import { resolveApiUrl } from "@/lib/api/client";
 import { useUploadDrugImage } from "@/lib/api/resources";
 import { t } from "@/lib/i18n/messages";
 
@@ -15,12 +16,19 @@ export function ImageUploader({ drugId, imageUrl }: ImageUploaderProps) {
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
   const upload = useUploadDrugImage(drugId);
+  const resolvedImageUrl = resolveApiUrl(previewUrl ?? imageUrl);
 
   return (
     <section className="section-panel" aria-labelledby="image-upload-title">
       <h2 id="image-upload-title">{t("image")}</h2>
-      {(previewUrl ?? imageUrl) ? (
-        <img className="resource-image" src={previewUrl ?? imageUrl} alt={t("imageAlt")} />
+      {resolvedImageUrl ? (
+        <img
+          className="resource-image"
+          src={resolvedImageUrl}
+          alt={t("imageAlt")}
+          width="180"
+          height="180"
+        />
       ) : (
         <p className="muted">{t("imageUnset")}</p>
       )}

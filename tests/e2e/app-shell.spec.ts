@@ -85,13 +85,15 @@ test("renders the local CMS shell and resource navigation", async ({ page }) => 
 
   await page.goto("/");
 
-  await expect(page.getByRole("link", { name: "架空医薬品・疾患リファレンス CMS" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "架空医薬品・疾患 リファレンス CMS" })).toBeVisible();
   await expect(
     page.getByRole("navigation", { name: "リソース" }).getByRole("link", { name: "医薬品" }),
   ).toBeVisible();
   await expect(
     page.getByRole("navigation", { name: "リソース" }).getByRole("link", { name: "疾患" }),
   ).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "ページ" }).first()).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "ページ" }).last()).toBeVisible();
   await expect(page.getByRole("heading", { name: "医薬品一覧" })).toBeVisible();
   await expect(page).toHaveScreenshot("cms-drug-list-desktop.png", { fullPage: true });
 });
@@ -106,11 +108,11 @@ test("renders structured drug editor controls instead of JSON textareas", async 
   await page.route("http://127.0.0.1:19090/v1/diseases**", async (route) => {
     await route.fulfill({
       json: {
-        items: [],
+        items: [{ id: "disease_0000", name: "ヒソネナ", icd10Chapter: "chapter_i" }],
         page: 1,
         pageSize: 100,
         totalPages: 1,
-        totalCount: 0,
+        totalCount: 1,
       },
     });
   });
@@ -121,6 +123,12 @@ test("renders structured drug editor controls instead of JSON textareas", async 
   await expect(page.getByLabel("剤形 必須")).toHaveValue("tablet");
   await expect(page.getByLabel("剤形 必須").locator("option:checked")).toHaveText("錠剤");
   await expect(page.getByRole("button", { name: "添加物追加" })).toBeVisible();
+  await expect(page.getByText("Markdown可")).toHaveCount(3);
+  const relatedDiseases = page.getByRole("group", { name: "関連疾患" });
+  await relatedDiseases.getByRole("option", { name: "ヒソネナ (disease_0000)" }).click();
+  await expect(relatedDiseases).toContainText("選択中: 1 件");
+  await relatedDiseases.getByRole("button", { name: "ヒソネナ (disease_0000) 削除" }).click();
+  await expect(relatedDiseases).toContainText("選択中: 0 件");
   await expect(page.getByText("JSON")).toHaveCount(0);
   await expect(page).toHaveScreenshot("cms-drug-editor-desktop.png", { fullPage: true });
 });

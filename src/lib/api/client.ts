@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { getPublicConfig } from "@/lib/config/config";
 import { parseProblemDetails, problemToAppError } from "@/lib/errors/problem";
 import type { AppError, Result } from "@/lib/errors/types";
+import { t } from "@/lib/i18n/messages";
 import { getAccessToken, setAccessToken } from "@/lib/security/token-store";
 
 type ApiFetchOptions<T> = {
@@ -17,6 +18,16 @@ export type ApiValue<T> = {
   data: T;
   etag?: string;
 };
+
+export function resolveApiUrl(pathOrUrl: string | undefined): string | undefined {
+  if (pathOrUrl === undefined || pathOrUrl === "") {
+    return undefined;
+  }
+  if (/^(https?:|blob:|data:)/.test(pathOrUrl)) {
+    return pathOrUrl;
+  }
+  return `${getPublicConfig().apiBaseUrl}${pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`}`;
+}
 
 export async function apiFetch<T>(options: ApiFetchOptions<T>): Promise<Result<ApiValue<T>>> {
   const config = getPublicConfig();
@@ -73,7 +84,7 @@ export async function apiFetch<T>(options: ApiFetchOptions<T>): Promise<Result<A
         ok: false,
         error: {
           kind: "unexpected",
-          message: "API response schema mismatch.",
+          message: t("schemaMismatch"),
           cause: parsed.error,
         },
       };

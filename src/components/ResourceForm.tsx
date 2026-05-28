@@ -297,7 +297,7 @@ function DrugFields({ selfId }: { selfId?: string }) {
                 "geriatric",
               ],
             },
-            { name: "note", labelKey: "note", type: "textarea" },
+            { name: "note", labelKey: "note", type: "textarea", markdown: true },
           ]}
         />
         <FieldArrayEditor
@@ -352,7 +352,7 @@ function DrugFields({ selfId }: { selfId?: string }) {
           appendValue={{ heading: "", content: "" }}
           fields={[
             { name: "heading", labelKey: "heading" },
-            { name: "content", labelKey: "content", type: "textarea" },
+            { name: "content", labelKey: "content", type: "textarea", markdown: true },
           ]}
         />
         <TextAreaField name="pharmacology.mechanism" labelKey="pharmacologyMechanism" />
@@ -749,14 +749,24 @@ function NumberField(props: FieldProps) {
 function TextAreaField({ name, labelKey, required = false }: FieldProps) {
   const { register } = useFormContext();
   const label = t(labelKey);
+  const markdown = isMarkdownField(name);
   return (
     <label className="field field-wide">
       <span>
         {label} <span className="field-hint">{required ? t("required") : t("optional")}</span>
+        {markdown ? <span className="field-badge">{t("markdownAvailable")}</span> : null}
       </span>
       <textarea className="input textarea" autoComplete="off" {...register(name)} />
       <FieldError name={name} />
     </label>
+  );
+}
+
+function isMarkdownField(name: string): boolean {
+  return (
+    name === "pharmacology.mechanism" ||
+    name === "pharmacology.effect" ||
+    name === "physicochemicalProperties.description"
   );
 }
 

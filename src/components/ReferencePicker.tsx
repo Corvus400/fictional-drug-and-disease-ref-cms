@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { useFormContext } from "react-hook-form";
+import { useId, useMemo, useState } from "react";
+import { useController, useFormContext } from "react-hook-form";
 import { useResourceList } from "@/lib/api/resources";
 import type { ResourceKind } from "@/lib/api/schema";
 import { type MessageKey, t } from "@/lib/i18n/messages";
@@ -12,34 +12,105 @@ type ReferencePickerProps = {
 };
 
 export function ReferencePicker({ name, labelKey, kind, selfId }: ReferencePickerProps) {
-  const { register, watch } = useFormContext();
+  const { control } = useFormContext();
+  const { field } = useController({ control, name });
+  const searchId = useId();
   const label = t(labelKey);
-  const selected = new Set((watch(name) as string[] | undefined) ?? []);
+  const [query, setQuery] = useState("");
+  const selectedIds = useMemo(
+    () => (Array.isArray(field.value) ? (field.value as string[]) : []),
+    [field.value],
+  );
+  const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const list = useResourceList(kind, { page: 1, pageSize: 100 });
+  const resources = useMemo(() => list.data?.items ?? [], [list.data?.items]);
+  const labels = useMemo(
+    () => new Map(resources.map((item) => [item.id, resourceLabel(item)])),
+    [resources],
+  );
   const options = useMemo(
-    () => list.data?.items.filter((item) => item.id !== selfId) ?? [],
-    [list.data?.items, selfId],
+    () =>
+      resources
+        .filter((item) => item.id !== selfId)
+        .filter((item) => !selected.has(item.id))
+        .filter((item) => {
+          const haystack = resourceLabel(item).toLowerCase();
+          return query === "" || haystack.includes(query.toLowerCase());
+        }),
+    [query, resources, selected, selfId],
   );
 
+  function updateSelected(next: string[]) {
+    field.onChange(next);
+    field.onBlur();
+  }
+
+  function addReference(id: string) {
+    updateSelected([...selectedIds, id]);
+  }
+
+  function removeReference(id: string) {
+    updateSelected(selectedIds.filter((selectedId) => selectedId !== id));
+  }
+
   return (
-    <fieldset className="field-group">
+    <fieldset className="field-group field-wide reference-picker">
       <legend>{label}</legend>
-      <select aria-label={label} className="input" multiple {...register(name)}>
+      <label className="field" htmlFor={searchId}>
+        <span>{t("search")}</span>
+        <input
+          id={searchId}
+          className="input"
+          type="search"
+          autoComplete="off"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </label>
+      <div className="chip-row" aria-live="polite">
+        {selectedIds.map((id) => (
+          <span className="chip" key={id}>
+            {labels.get(id) ?? id}
+            <button
+              className="chip-remove"
+              type="button"
+              aria-label={`${labels.get(id) ?? id} ${t("remove")}`}
+              onClick={() => removeReference(id)}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="reference-option-list" role="listbox" aria-label={label}>
         {options.map((item) => {
-          const displayName =
-            "brandName" in item
-              ? `${item.brandName ?? item.id} (${item.id})`
-              : `${item.name ?? item.id} (${item.id})`;
           return (
-            <option key={item.id} value={item.id}>
-              {displayName}
-            </option>
+            <button
+              className="reference-option"
+              key={item.id}
+              type="button"
+              role="option"
+              aria-selected="false"
+              onClick={() => addReference(item.id)}
+            >
+              {resourceLabel(item)}
+            </button>
           );
         })}
-      </select>
+      </div>
       <p className="muted">
-        {t("selectedCount")}: {selected.size} {t("countSuffix")}
+        {t("selectedCount")}: {selectedIds.length} {t("countSuffix")}
       </p>
     </fieldset>
   );
+}
+
+function resourceLabel(item: { id: string; [key: string]: unknown }): string {
+  if (typeof item.brandName === "string") {
+    return `${item.brandName} / ${item.genericName ?? item.id} (${item.id})`;
+  }
+  if (typeof item.name === "string") {
+    return `${item.name} (${item.id})`;
+  }
+  return item.id;
 }

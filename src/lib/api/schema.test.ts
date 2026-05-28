@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  diseaseListSchema,
   diseaseRequestSchema,
   dosageForms,
+  drugListSchema,
   drugRequestSchema,
+  drugSchema,
   medicalDepartments,
   regulatoryClasses,
   routeOfAdministration,
+  toWireValue,
 } from "./schema";
 
 describe("CMS request schemas", () => {
@@ -156,5 +160,115 @@ describe("CMS request schemas", () => {
     expect(medicalDepartments).toContain("emergency");
     expect(medicalDepartments).toContain("infectious_disease");
     expect(medicalDepartments).not.toContain("respiratory_medicine");
+  });
+
+  it("parses snake_case live drug list responses into camelCase domain data", () => {
+    const parsed = drugListSchema.parse({
+      items: [
+        {
+          id: "drug_0001",
+          brand_name: "ライザ",
+          generic_name: "シャリブレ",
+          therapeutic_category_name: "消化器系および代謝",
+          dosage_form: "capsule",
+          atc_code: "A99ZZ01",
+          image_url: "/v1/images/dosage-forms/capsule?size=Original",
+        },
+      ],
+      page: 1,
+      page_size: 20,
+      total_pages: 6,
+      total_count: 120,
+    });
+
+    expect(parsed).toMatchObject({
+      pageSize: 20,
+      totalPages: 6,
+      totalCount: 120,
+      items: [{ brandName: "ライザ", dosageForm: "capsule", atcCode: "A99ZZ01" }],
+    });
+  });
+
+  it("parses live drug detail responses independently from create-form validation", () => {
+    const parsed = drugSchema.parse({
+      id: "drug_0080",
+      generic_name: "トレデキム",
+      brand_name: "トレデキム",
+      brand_name_kana: "トレデキム",
+      atc_code: "L99ZZ80",
+      yj_code: "999171158264",
+      therapeutic_category_name: "対魔女兵器 (架空分類)",
+      regulatory_class: ["poison", "prescription_required"],
+      dosage_form: "liquid",
+      route_of_administration: "oral",
+      composition: {
+        active_ingredient: "トレデキム",
+        active_ingredient_amount: { amount: 10, unit: "ml", per: null },
+        inactive_ingredients: ["ウルクウ"],
+        appearance: "無色澄明の液体",
+      },
+      warning: [{ order: 1, sub_order: null, content: "警告" }],
+      contraindications: [{ order: 1, sub_order: null, content: "禁忌" }],
+      indications: [],
+      dosage: { standard_dosage: "治療用量は設定されていない" },
+      adverse_reactions: {
+        serious: [],
+        other: {
+          over5_percent: [],
+          between1_and5_percent: [],
+          under1_percent: [],
+          frequency_unknown: ["急性疼痛"],
+        },
+      },
+      packages: [],
+      manufacturer: "魔女因子研究所",
+      related_disease_ids: ["disease_0079"],
+      image_url: "/v1/images/drugs/drug_0080?size=Original",
+    });
+
+    expect(parsed).toMatchObject({
+      brandName: "トレデキム",
+      indications: [],
+      imageUrl: "/v1/images/drugs/drug_0080?size=Original",
+      relatedDiseaseIds: ["disease_0079"],
+    });
+  });
+
+  it("parses snake_case live disease list responses into camelCase domain data", () => {
+    const parsed = diseaseListSchema.parse({
+      items: [
+        {
+          id: "disease_0001",
+          name: "架空疾患",
+          icd10_chapter: "chapter_i",
+          chronicity: "acute",
+        },
+      ],
+      page: 1,
+      page_size: 20,
+      total_pages: 4,
+      total_count: 80,
+    });
+
+    expect(parsed).toMatchObject({
+      pageSize: 20,
+      totalPages: 4,
+      totalCount: 80,
+      items: [{ icd10Chapter: "chapter_i" }],
+    });
+  });
+
+  it("serializes camelCase request fragments to snake_case wire payloads", () => {
+    expect(
+      toWireValue({
+        brandName: "更新後",
+        relatedDiseaseIds: ["disease_0001"],
+        composition: { activeIngredientAmount: { amount: 10, unit: "mg" } },
+      }),
+    ).toEqual({
+      brand_name: "更新後",
+      related_disease_ids: ["disease_0001"],
+      composition: { active_ingredient_amount: { amount: 10, unit: "mg" } },
+    });
   });
 });

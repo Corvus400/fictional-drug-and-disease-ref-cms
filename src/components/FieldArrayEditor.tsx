@@ -12,6 +12,7 @@ type FieldArrayEditorProps = {
     labelKey: MessageKey;
     type?: "text" | "number" | "checkbox" | "textarea" | "select";
     options?: readonly string[];
+    markdown?: boolean;
   }>;
 };
 
@@ -87,7 +88,12 @@ export function FieldArrayEditor({
                   };
                   return (
                     <label className="field" htmlFor={inputId} key={fieldName}>
-                      <span>{fieldLabel}</span>
+                      <span>
+                        {fieldLabel}
+                        {rowField.markdown === true ? (
+                          <span className="field-badge">{t("markdownAvailable")}</span>
+                        ) : null}
+                      </span>
                       {rowField.type === "textarea" ? (
                         <textarea
                           className="input textarea"

@@ -1,5 +1,7 @@
 const messages = {
   appTitle: "架空医薬品・疾患リファレンス CMS",
+  appTitleLine1: "架空医薬品・疾患",
+  appTitleLine2: "リファレンス CMS",
   dashboard: "ダッシュボード",
   drugs: "医薬品",
   diseases: "疾患",
@@ -23,12 +25,15 @@ const messages = {
   totalCount: "総件数",
   required: "必須",
   optional: "任意",
+  markdownAvailable: "Markdown可",
   loading: "読み込み中…",
   noItems: "該当するレコードがありません",
   unauthorized: "認証が必要です。管理トークンを再取得してください。",
   forbidden: "管理権限が不足しています。",
   rateLimited: "操作が多すぎます。少し待ってから再試行してください。",
   networkError: "通信に失敗しました。管理面の起動状態を確認してください。",
+  schemaMismatch:
+    "データを読み込めませんでした。管理面を再起動してから、もう一度読み込んでください。",
   validationError: "入力内容を確認してください。",
   conflict: "サーバ側で更新されました。最新を取得しました。差分を確認して再編集してください。",
   referenceConflict: "他のリソースから参照されているため削除できません。",

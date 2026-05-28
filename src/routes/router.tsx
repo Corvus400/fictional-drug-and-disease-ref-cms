@@ -11,12 +11,14 @@ import {
   useParams,
   useSearch,
 } from "@tanstack/react-router";
+import { Database, Plus, Search, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ErrorNotice } from "@/components/ErrorNotice";
 import { ImageUploader } from "@/components/ImageUploader";
 import { ResourceForm } from "@/components/ResourceForm";
+import { resolveApiUrl } from "@/lib/api/client";
 import { useDeleteResource, useResourceDetail, useResourceList } from "@/lib/api/resources";
 import {
   type Disease,
@@ -149,26 +151,12 @@ function RootLayout() {
       <aside className="sidebar">
         <p className="eyebrow">{t("localAdmin")}</p>
         <Link className="brand" to="/drugs" search={defaultSearch}>
-          {t("appTitle")}
+          <Database aria-hidden="true" size={20} />
+          <span className="brand-copy">
+            <span>{t("appTitleLine1")}</span>
+            <span>{t("appTitleLine2")}</span>
+          </span>
         </Link>
-        <nav aria-label={t("resourceNavigation")}>
-          <Link
-            activeProps={{ className: "nav-link active" }}
-            className="nav-link"
-            to="/drugs"
-            search={defaultSearch}
-          >
-            {t("drugs")}
-          </Link>
-          <Link
-            activeProps={{ className: "nav-link active" }}
-            className="nav-link"
-            to="/diseases"
-            search={defaultSearch}
-          >
-            {t("diseases")}
-          </Link>
-        </nav>
       </aside>
       <main className="main-pane" id="main-content">
         <Outlet />
@@ -185,7 +173,7 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
 
   return (
     <section className="page-stack" aria-labelledby="list-title">
-      <header className="page-header">
+      <header className="console-header">
         <div>
           <p className="breadcrumb">
             {t("dashboard")} / {title}
@@ -194,13 +182,27 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
             {title}
             {t("list")}
           </h1>
+          <p className="page-lede">
+            {kind === "drugs"
+              ? "医薬品レコード、剤形、ATC コード、画像状態を確認します。"
+              : "疾患レコード、ICD-10 章、慢性度、関連リソースを確認します。"}
+          </p>
         </div>
-        <a className="button button-primary" href={`/${kind}/new`}>
+        <Link className="button button-primary" to={`/${kind}/new`}>
+          <Plus aria-hidden="true" size={16} />
           {t("create")}
-        </a>
+        </Link>
       </header>
+      <div className="status-strip">
+        <span className="status-pill">
+          <ShieldCheck aria-hidden="true" size={14} />
+          Local only
+        </span>
+        <span className="status-pill">API: 127.0.0.1</span>
+        <span className="status-pill">FICTIONAL DATA</span>
+      </div>
       <form
-        className="toolbar"
+        className="filter-panel"
         onSubmit={(event) => {
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
@@ -218,6 +220,10 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
           });
         }}
       >
+        <div className="filter-panel-title">
+          <Search aria-hidden="true" size={17} />
+          {t("search")}
+        </div>
         <label className="field compact">
           <span>{t("search")}</span>
           <input className="input" autoComplete="off" defaultValue={search.q ?? ""} name="q" />
@@ -267,13 +273,38 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
       {list.error ? <ErrorNotice error={list.error} /> : null}
       {list.data ? (
         <>
-          <p className="muted">
-            {t("totalCount")}: {list.data.totalCount}
-          </p>
-          <div className="table-wrap">
+          <div className="summary-row">
+            <span className="metric-card">
+              <strong className="tabular">{list.data.totalCount}</strong>
+              {t("totalCount")}
+            </span>
+            <span className="metric-card">
+              <strong className="tabular">
+                {search.page} / {list.data.totalPages}
+              </strong>
+              {t("page")}
+            </span>
+            <PaginationControls
+              currentPage={search.page}
+              totalPages={list.data.totalPages}
+              onPrevious={() =>
+                navigate({
+                  search: (previous) => ({ ...previous, page: Math.max(1, search.page - 1) }),
+                })
+              }
+              onNext={() =>
+                navigate({
+                  search: (previous) => ({ ...previous, page: search.page + 1 }),
+                })
+              }
+            />
+            <ResourceSwitcher />
+          </div>
+          <div className="table-wrap data-panel">
             <table>
               <thead>
                 <tr>
+                  {kind === "drugs" ? <th>{t("image")}</th> : null}
                   <th>ID</th>
                   <th>{t("name")}</th>
                   <th>{t("category")}</th>
@@ -283,13 +314,20 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
               <tbody>
                 {list.data.items.map((item) => (
                   <tr key={item.id}>
+                    {kind === "drugs" ? (
+                      <td>
+                        <ResourceThumbnail item={item} />
+                      </td>
+                    ) : null}
                     <td>{item.id}</td>
                     <td>{resourceDisplayName(item)}</td>
-                    <td>{resourceCategory(item)}</td>
                     <td>
-                      <a className="text-link" href={`/${kind}/${item.id}`}>
+                      <span className="chip">{resourceCategory(item)}</span>
+                    </td>
+                    <td>
+                      <Link className="text-link" to={`/${kind}/$id`} params={{ id: item.id }}>
                         {t("detail")}
-                      </a>
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -297,44 +335,98 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
             </table>
           </div>
           {list.data.items.length === 0 ? <p>{t("noItems")}</p> : null}
-          <nav className="pagination" aria-label={t("page")}>
-            <button
-              className="button button-secondary"
-              type="button"
-              disabled={search.page <= 1}
-              onClick={() =>
-                navigate({
-                  search: (previous) => ({ ...previous, page: Math.max(1, search.page - 1) }),
-                })
-              }
-            >
-              {t("previousPage")}
-            </button>
-            <span className="tabular">
-              {t("page")}: {search.page} / {list.data.totalPages}
-            </span>
-            <button
-              className="button button-secondary"
-              type="button"
-              disabled={search.page >= list.data.totalPages}
-              onClick={() =>
-                navigate({
-                  search: (previous) => ({ ...previous, page: search.page + 1 }),
-                })
-              }
-            >
-              {t("nextPage")}
-            </button>
-          </nav>
+          <PaginationControls
+            currentPage={search.page}
+            totalPages={list.data.totalPages}
+            onPrevious={() =>
+              navigate({
+                search: (previous) => ({ ...previous, page: Math.max(1, search.page - 1) }),
+              })
+            }
+            onNext={() =>
+              navigate({
+                search: (previous) => ({ ...previous, page: search.page + 1 }),
+              })
+            }
+          />
         </>
       ) : null}
     </section>
   );
 }
 
+function PaginationControls({
+  currentPage,
+  totalPages,
+  onPrevious,
+  onNext,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <nav className="pagination pagination-top" aria-label={t("page")}>
+      <button
+        className="button button-secondary"
+        type="button"
+        disabled={currentPage <= 1}
+        onClick={onPrevious}
+      >
+        {t("previousPage")}
+      </button>
+      <span className="tabular">
+        {t("page")}: {currentPage} / {totalPages}
+      </span>
+      <button
+        className="button button-secondary"
+        type="button"
+        disabled={currentPage >= totalPages}
+        onClick={onNext}
+      >
+        {t("nextPage")}
+      </button>
+    </nav>
+  );
+}
+
+function ResourceSwitcher() {
+  return (
+    <nav className="resource-switcher" aria-label={t("resourceNavigation")}>
+      <Link
+        activeProps={{ className: "switch-link active" }}
+        className="switch-link"
+        to="/drugs"
+        search={defaultSearch}
+      >
+        {t("drugs")}
+      </Link>
+      <Link
+        activeProps={{ className: "switch-link active" }}
+        className="switch-link"
+        to="/diseases"
+        search={defaultSearch}
+      >
+        {t("diseases")}
+      </Link>
+    </nav>
+  );
+}
+
 function emptyToUndefined(value: FormDataEntryValue | null): string | undefined {
   const text = String(value ?? "");
   return text === "" ? undefined : text;
+}
+
+function ResourceThumbnail({ item }: { item: unknown }) {
+  if (typeof item !== "object" || item === null || !("imageUrl" in item)) {
+    return null;
+  }
+  const url = resolveApiUrl(typeof item.imageUrl === "string" ? item.imageUrl : undefined);
+  return url ? (
+    <img className="thumb" src={url} alt="" width="42" height="42" loading="lazy" />
+  ) : null;
 }
 
 function ResourceDetail({ kind }: { kind: ResourceKind }) {
@@ -362,14 +454,21 @@ function ResourceDetail({ kind }: { kind: ResourceKind }) {
       <header className="page-header">
         <div>
           <p className="breadcrumb">
-            <a href={`/${kind}`}>{title}</a> / {data.id}
+            <Link to={`/${kind}`} search={defaultSearch}>
+              {title}
+            </Link>{" "}
+            / {data.id}
           </p>
           <h1 id="detail-title">{resourceDisplayName(data)}</h1>
         </div>
         <div className="button-row">
-          <a className="button button-secondary" href={`/${kind}/${data.id}/edit`}>
+          <Link
+            className="button button-secondary"
+            to={`/${kind}/$id/edit`}
+            params={{ id: data.id }}
+          >
             {t("edit")}
-          </a>
+          </Link>
           <button
             className="button button-danger"
             type="button"
@@ -550,7 +649,10 @@ function ResourceEditor({ kind }: { kind: ResourceKind }) {
       <header className="page-header">
         <div>
           <p className="breadcrumb">
-            <a href={`/${kind}`}>{title}</a> / {isNew ? t("create") : params.id}
+            <Link to={`/${kind}`} search={defaultSearch}>
+              {title}
+            </Link>{" "}
+            / {isNew ? t("create") : params.id}
           </p>
           <h1 id="editor-title">
             {title}

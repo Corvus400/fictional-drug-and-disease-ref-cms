@@ -8,7 +8,7 @@ const strictCsp = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: http://127.0.0.1:19090",
   "connect-src 'self' http://127.0.0.1:19090",
   "object-src 'none'",
   "base-uri 'self'",

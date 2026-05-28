@@ -13,6 +13,7 @@ import {
   drugRequestSchema,
   drugSchema,
   type ResourceKind,
+  toWireValue,
 } from "./schema";
 
 export type ListParams = {
@@ -119,7 +120,7 @@ export function useUploadDrugImage(id: string) {
 
 export async function listResources(kind: ResourceKind, params: ListParams) {
   return apiFetch({
-    path: `/v1/${kind}${toQuery(params)}`,
+    path: `/v1/${kind}${toListQuery(kind, params)}`,
     schema: kind === "drugs" ? drugListSchema : diseaseListSchema,
   });
 }
@@ -135,7 +136,7 @@ async function createResource(kind: ResourceKind, data: DrugRequest | DiseaseReq
   return apiFetch({
     path: `/v1/admin/${kind}`,
     method: "POST",
-    body: requestSchema(kind).parse(data),
+    body: toWireValue(requestSchema(kind).parse(data)),
     schema: responseSchema(kind),
   });
 }
@@ -149,7 +150,7 @@ export async function patchResource(
   return apiFetch({
     path: `/v1/admin/${kind}/${id}`,
     method: "PATCH",
-    body: patch,
+    body: toWireValue(patch),
     headers: {
       ...(etag === undefined ? {} : { "If-Match": etag }),
       "Content-Type": "application/merge-patch+json",
@@ -178,13 +179,32 @@ function singular(kind: ResourceKind): "drug" | "disease" {
   return kind === "drugs" ? "drug" : "disease";
 }
 
-function toQuery(params: ListParams): string {
+function toListQuery(kind: ResourceKind, params: ListParams): string {
   const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== "") {
-      search.set(key, String(value));
-    }
+  setParam(search, "page", params.page);
+  setParam(search, "page_size", params.pageSize);
+  setParam(search, "keyword", params.q);
+  setParam(search, "sort", toWireSort(params.sort));
+
+  if (kind === "drugs") {
+    setParam(search, "dosage_form", params.dosageForm);
+    setParam(search, "category_atc", params.atcCode);
+  } else {
+    setParam(search, "icd10_chapter", params.icd10Chapter);
   }
   const query = search.toString();
   return query.length === 0 ? "" : `?${query}`;
+}
+
+function setParam(search: URLSearchParams, key: string, value: unknown): void {
+  if (value !== undefined && value !== "") {
+    search.set(key, String(value));
+  }
+}
+
+function toWireSort(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return String(toWireValue(value));
 }
