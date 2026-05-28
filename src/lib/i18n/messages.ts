@@ -10,10 +10,17 @@ const messages = {
   edit: "編集",
   create: "新規作成",
   save: "保存",
+  replaceAll: "全置換",
+  replaceAllTitle: "全置換を確定",
+  replaceAllDescription:
+    "未入力の任意フィールドは既定値に戻ります。この操作は影響が大きいため確認してください。",
+  replaceAllConfirm: "全置換を実行",
   delete: "削除",
   cancel: "キャンセル",
   confirmDelete: "削除を確定",
   search: "検索",
+  keywordMatch: "検索一致",
+  keywordTarget: "検索対象",
   sort: "並び順",
   sortDefault: "既定順",
   sortName: "名称",
@@ -149,6 +156,7 @@ const messages = {
   handlingPrecautions: "取扱い上の注意",
   approvalConditions: "承認条件",
   packages: "包装",
+  storageCondition: "保存条件",
   packageSize: "包装単位",
   storageTemperature: "保存温度",
   lightProtection: "遮光",
@@ -254,6 +262,10 @@ export function t(key: MessageKey): string {
   return messages[key];
 }
 
+export function formatMessageKey(value: string): string {
+  return value in messages ? messages[value as MessageKey] : value;
+}
+
 const optionLabels: Record<string, string> = {
   tablet: "錠剤",
   capsule: "カプセル",
@@ -343,6 +355,12 @@ const optionLabels: Record<string, string> = {
   pediatrics: "小児科",
   emergency: "救急",
   infectious_disease: "感染症科",
+  partial: "部分一致",
+  prefix: "前方一致",
+  generic: "一般名",
+  brand: "販売名",
+  both: "一般名・販売名",
+  name_english: "英語名",
   chapter_i: "第 I 章 感染症・寄生虫症",
   chapter_ii: "第 II 章 新生物",
   chapter_iii: "第 III 章 血液・免疫",

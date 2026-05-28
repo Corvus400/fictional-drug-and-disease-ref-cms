@@ -109,6 +109,10 @@ const examCategories = [
   "interview",
 ] as const;
 
+export const precautionCategories = precautionPopulationCategories;
+export const onsetPatternOptions = onsetPatterns;
+export const examCategoryOptions = examCategories;
+
 const nonEmptyString = z.string().trim().min(1);
 const optionalString = z
   .string()

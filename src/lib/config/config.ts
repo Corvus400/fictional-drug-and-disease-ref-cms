@@ -25,6 +25,19 @@ export function parsePublicConfig(env: Record<string, unknown>): PublicConfig {
 let cachedConfig: PublicConfig | undefined;
 
 export function getPublicConfig(): PublicConfig {
-  cachedConfig ??= parsePublicConfig(import.meta.env);
+  cachedConfig ??= parsePublicConfig(readPublicEnv());
   return cachedConfig;
+}
+
+export function resetPublicConfigForTests(): void {
+  cachedConfig = undefined;
+}
+
+export function setPublicConfigForTests(config: PublicConfig): void {
+  cachedConfig = config;
+}
+
+function readPublicEnv(): Record<string, unknown> {
+  const runtimeProcess = (globalThis as { process?: { env?: Record<string, unknown> } }).process;
+  return { ...import.meta.env, ...(runtimeProcess?.env ?? {}) };
 }

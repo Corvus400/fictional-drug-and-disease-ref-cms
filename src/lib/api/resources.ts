@@ -22,7 +22,21 @@ export type ListParams = {
   pageSize?: number;
   dosageForm?: string;
   atcCode?: string;
+  regulatoryClass?: string;
+  route?: string;
+  keywordMatch?: string;
+  keywordTarget?: string;
+  adverseReactionKeyword?: string;
+  precautionCategory?: string;
   icd10Chapter?: string;
+  department?: string;
+  chronicity?: string;
+  infectious?: string;
+  symptomKeyword?: string;
+  onsetPattern?: string;
+  examCategory?: string;
+  hasPharmacologicalTreatment?: string;
+  hasSeverityGrading?: string;
   sort?: string;
 };
 
@@ -89,6 +103,37 @@ export type SaveResourcePayload = {
   data: DrugRequest | DiseaseRequest;
   patch: Partial<DrugRequest> | Partial<DiseaseRequest>;
 };
+
+export function useReplaceResource(kind: ResourceKind, id?: string, etag?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: DrugRequest | DiseaseRequest) => {
+      if (id === undefined) {
+        throw new Error("Cannot replace a resource without an id.");
+      }
+      const result = await putResource(kind, id, data, etag);
+      if (!result.ok) {
+        throw result.error;
+      }
+      return result.value.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [kind] });
+      queryClient.invalidateQueries({ queryKey: [singular(kind), data.id] });
+    },
+    onError: (error) => {
+      if (
+        id !== undefined &&
+        typeof error === "object" &&
+        error !== null &&
+        "kind" in error &&
+        error.kind === "conflict"
+      ) {
+        queryClient.refetchQueries({ queryKey: [singular(kind), id], type: "active" });
+      }
+    },
+  });
+}
 
 export function useDeleteResource(kind: ResourceKind, id: string, etag?: string) {
   const queryClient = useQueryClient();
@@ -171,6 +216,21 @@ export async function patchResource(
   });
 }
 
+export async function putResource(
+  kind: ResourceKind,
+  id: string,
+  data: DrugRequest | DiseaseRequest,
+  etag?: string,
+) {
+  return apiFetch({
+    path: `/v1/admin/${kind}/${id}`,
+    method: "PUT",
+    body: toWireValue(requestSchema(kind).parse(data)),
+    headers: etag === undefined ? undefined : { "If-Match": etag },
+    schema: responseSchema(kind),
+  });
+}
+
 async function deleteResource(kind: ResourceKind, id: string, etag?: string) {
   return apiFetch({
     path: `/v1/admin/${kind}/${id}`,
@@ -191,18 +251,32 @@ function singular(kind: ResourceKind): "drug" | "disease" {
   return kind === "drugs" ? "drug" : "disease";
 }
 
-function toListQuery(kind: ResourceKind, params: ListParams): string {
+export function toListQuery(kind: ResourceKind, params: ListParams): string {
   const search = new URLSearchParams();
   setParam(search, "page", params.page);
   setParam(search, "page_size", params.pageSize);
   setParam(search, "keyword", params.q);
-  setParam(search, "sort", toWireSort(params.sort));
+  setParam(search, "keyword_match", params.keywordMatch);
+  setParam(search, "keyword_target", params.keywordTarget);
+  setParam(search, "sort", params.sort);
 
   if (kind === "drugs") {
     setParam(search, "dosage_form", params.dosageForm);
     setParam(search, "category_atc", params.atcCode);
+    setParam(search, "regulatory_class", params.regulatoryClass);
+    setParam(search, "route", params.route);
+    setParam(search, "adverse_reaction_keyword", params.adverseReactionKeyword);
+    setParam(search, "precaution_category", params.precautionCategory);
   } else {
     setParam(search, "icd10_chapter", params.icd10Chapter);
+    setParam(search, "department", params.department);
+    setParam(search, "chronicity", params.chronicity);
+    setParam(search, "infectious", params.infectious);
+    setParam(search, "symptom_keyword", params.symptomKeyword);
+    setParam(search, "onset_pattern", params.onsetPattern);
+    setParam(search, "exam_category", params.examCategory);
+    setParam(search, "has_pharmacological_treatment", params.hasPharmacologicalTreatment);
+    setParam(search, "has_severity_grading", params.hasSeverityGrading);
   }
   const query = search.toString();
   return query.length === 0 ? "" : `?${query}`;
@@ -212,11 +286,4 @@ function setParam(search: URLSearchParams, key: string, value: unknown): void {
   if (value !== undefined && value !== "") {
     search.set(key, String(value));
   }
-}
-
-function toWireSort(value: string | undefined): string | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  return value.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
 }

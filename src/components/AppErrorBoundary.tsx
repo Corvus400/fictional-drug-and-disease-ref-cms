@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { t } from "@/lib/i18n/messages";
+import { redactToken } from "@/lib/security/token-store";
 
 type AppErrorBoundaryProps = {
   children: ReactNode;
@@ -17,7 +18,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error(error.message, info.componentStack);
+    console.error(redactToken(error.message), redactToken(info.componentStack ?? ""));
   }
 
   render() {

@@ -147,9 +147,12 @@ describe("CMS mutation flows", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "テスト販売名" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "リソース" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "基本情報" })).toBeInTheDocument();
     expect(screen.getByText("販売名")).toBeInTheDocument();
     expect(screen.getAllByText("テスト販売名").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/保存条件:/)).toBeInTheDocument();
+    expect(screen.queryByText(/storageCondition/)).not.toBeInTheDocument();
     expect(screen.queryByText(/"brandName"/)).not.toBeInTheDocument();
   });
 
@@ -185,11 +188,11 @@ describe("CMS mutation flows", () => {
 
     render(<App />);
 
-    await user.selectOptions(await screen.findByLabelText("並び順"), "brandName");
+    await user.selectOptions(await screen.findByLabelText("並び順"), "brand_name_kana");
     await user.click(screen.getByRole("button", { name: "検索" }));
 
-    expect(window.location.search).toContain("sort=brandName");
-    await waitFor(() => expect(lastDrugListUrl).toContain("sort=brand_name"));
+    expect(window.location.search).toContain("sort=brand_name_kana");
+    await waitFor(() => expect(lastDrugListUrl).toContain("sort=brand_name_kana"));
   });
 
   it("searches reference candidates through the API and resolves selected labels by id", async () => {
@@ -254,5 +257,28 @@ describe("CMS mutation flows", () => {
 
     expect(await screen.findByRole("heading", { name: "画像" })).toBeInTheDocument();
     expect(screen.getByLabelText("PNG を選択")).toBeInTheDocument();
+  });
+
+  it("requires confirmation before sending a full replacement PUT", async () => {
+    let putCalled = false;
+    server.use(
+      http.put("http://127.0.0.1:19090/v1/admin/drugs/drug_0001", () => {
+        putCalled = true;
+        return HttpResponse.json(drugFixture, { headers: { ETag: '"v2"' } });
+      }),
+    );
+    const user = userEvent.setup();
+    window.history.pushState(null, "", "/drugs/drug_0001/edit");
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "全置換" }));
+
+    expect(putCalled).toBe(false);
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("全置換を確定");
+
+    await user.click(screen.getByRole("button", { name: "全置換を実行" }));
+
+    await waitFor(() => expect(putCalled).toBe(true));
   });
 });

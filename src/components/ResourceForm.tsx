@@ -1,9 +1,9 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useBlocker } from "@tanstack/react-router";
 import { Save } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { FormProvider, type Path, type Resolver, useForm, useFormContext } from "react-hook-form";
-import { useSaveResource } from "@/lib/api/resources";
+import { useReplaceResource, useSaveResource } from "@/lib/api/resources";
 import {
   chronicities,
   type Disease,
@@ -20,6 +20,7 @@ import {
   routeOfAdministration,
 } from "@/lib/api/schema";
 import { formatOption, type MessageKey, t } from "@/lib/i18n/messages";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { ErrorNotice } from "./ErrorNotice";
 import { FieldArrayEditor } from "./FieldArrayEditor";
 import { ReferencePicker } from "./ReferencePicker";
@@ -55,6 +56,8 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
     }) as unknown as Resolver<FormRecord>,
   });
   const save = useSaveResource(kind, initialValue?.id, etag);
+  const replace = useReplaceResource(kind, initialValue?.id, etag);
+  const [replaceData, setReplaceData] = useState<FormValue>();
 
   useEffect(() => {
     if (!form.formState.isDirty) {
@@ -103,6 +106,32 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
     );
   }
 
+  function requestReplace(value: FormRecord) {
+    setReplaceData(schema.parse(value) as FormValue);
+  }
+
+  function confirmReplace() {
+    if (replaceData === undefined) {
+      return;
+    }
+    replace.mutate(replaceData, {
+      onSuccess: (saved) => {
+        setReplaceData(undefined);
+        form.reset(toDefaultValue(kind, saved) as FormRecord);
+        onSaved?.(saved.id);
+      },
+      onError: (error) => {
+        setReplaceData(undefined);
+        if (typeof error === "object" && error !== null && "fields" in error) {
+          const fields = error.fields as Array<{ field: string; message: string }>;
+          for (const field of fields) {
+            form.setError(field.field as Path<FormRecord>, { message: field.message });
+          }
+        }
+      },
+    });
+  }
+
   return (
     <FormProvider {...form}>
       <form className="form-grid" onSubmit={form.handleSubmit(submit)}>
@@ -123,7 +152,18 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
           )}
         </AccordionRoot>
         {save.error ? <ErrorNotice error={save.error} /> : null}
+        {replace.error ? <ErrorNotice error={replace.error} /> : null}
         <div className="button-row sticky-actions">
+          {initialValue?.id === undefined ? null : (
+            <button
+              className="button button-danger"
+              type="button"
+              disabled={replace.isPending}
+              onClick={form.handleSubmit(requestReplace)}
+            >
+              {replace.isPending ? t("loading") : t("replaceAll")}
+            </button>
+          )}
           <button className="button button-primary" type="submit" disabled={save.isPending}>
             <Save aria-hidden="true" size={16} />
             {save.isPending ? t("loading") : t("save")}
@@ -134,6 +174,15 @@ export function ResourceForm({ kind, initialValue, etag, onSaved }: ResourceForm
             </span>
           ) : null}
         </div>
+        <ConfirmDialog
+          open={replaceData !== undefined}
+          title={t("replaceAllTitle")}
+          description={t("replaceAllDescription")}
+          confirmLabel={t("replaceAllConfirm")}
+          pending={replace.isPending}
+          onCancel={() => setReplaceData(undefined)}
+          onConfirm={confirmReplace}
+        />
       </form>
     </FormProvider>
   );

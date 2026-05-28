@@ -21,13 +21,20 @@ import { ResourceForm } from "@/components/ResourceForm";
 import { resolveApiUrl } from "@/lib/api/client";
 import { useDeleteResource, useResourceDetail, useResourceList } from "@/lib/api/resources";
 import {
+  chronicities,
   type Disease,
   type Drug,
   dosageForms,
+  examCategoryOptions,
   icd10Chapters,
+  medicalDepartments,
+  onsetPatternOptions,
+  precautionCategories,
   type ResourceKind,
+  regulatoryClasses,
+  routeOfAdministration,
 } from "@/lib/api/schema";
-import { formatOption, t } from "@/lib/i18n/messages";
+import { formatMessageKey, formatOption, t } from "@/lib/i18n/messages";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,7 +51,21 @@ const searchSchema = z.object({
   pageSize: z.coerce.number().int().positive().catch(20),
   dosageForm: z.string().optional(),
   atcCode: z.string().optional(),
+  regulatoryClass: z.string().optional(),
+  route: z.string().optional(),
+  keywordMatch: z.string().optional(),
+  keywordTarget: z.string().optional(),
+  adverseReactionKeyword: z.string().optional(),
+  precautionCategory: z.string().optional(),
   icd10Chapter: z.string().optional(),
+  department: z.string().optional(),
+  chronicity: z.string().optional(),
+  infectious: z.string().optional(),
+  symptomKeyword: z.string().optional(),
+  onsetPattern: z.string().optional(),
+  examCategory: z.string().optional(),
+  hasPharmacologicalTreatment: z.string().optional(),
+  hasSeverityGrading: z.string().optional(),
   sort: z.string().optional(),
 });
 const defaultSearch = { page: 1, pageSize: 20 };
@@ -157,6 +178,7 @@ function RootLayout() {
             <span>{t("appTitleLine2")}</span>
           </span>
         </Link>
+        <ResourceSwitcher />
       </aside>
       <main className="main-pane" id="main-content">
         <Outlet />
@@ -211,8 +233,39 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
               dosageForm:
                 kind === "drugs" ? emptyToUndefined(formData.get("dosageForm")) : undefined,
               atcCode: kind === "drugs" ? emptyToUndefined(formData.get("atcCode")) : undefined,
+              regulatoryClass:
+                kind === "drugs" ? emptyToUndefined(formData.get("regulatoryClass")) : undefined,
+              route: kind === "drugs" ? emptyToUndefined(formData.get("route")) : undefined,
+              adverseReactionKeyword:
+                kind === "drugs"
+                  ? emptyToUndefined(formData.get("adverseReactionKeyword"))
+                  : undefined,
+              precautionCategory:
+                kind === "drugs" ? emptyToUndefined(formData.get("precautionCategory")) : undefined,
               icd10Chapter:
                 kind === "diseases" ? emptyToUndefined(formData.get("icd10Chapter")) : undefined,
+              department:
+                kind === "diseases" ? emptyToUndefined(formData.get("department")) : undefined,
+              chronicity:
+                kind === "diseases" ? emptyToUndefined(formData.get("chronicity")) : undefined,
+              infectious:
+                kind === "diseases" ? emptyToUndefined(formData.get("infectious")) : undefined,
+              symptomKeyword:
+                kind === "diseases" ? emptyToUndefined(formData.get("symptomKeyword")) : undefined,
+              onsetPattern:
+                kind === "diseases" ? emptyToUndefined(formData.get("onsetPattern")) : undefined,
+              examCategory:
+                kind === "diseases" ? emptyToUndefined(formData.get("examCategory")) : undefined,
+              hasPharmacologicalTreatment:
+                kind === "diseases"
+                  ? emptyToUndefined(formData.get("hasPharmacologicalTreatment"))
+                  : undefined,
+              hasSeverityGrading:
+                kind === "diseases"
+                  ? emptyToUndefined(formData.get("hasSeverityGrading"))
+                  : undefined,
+              keywordMatch: emptyToUndefined(formData.get("keywordMatch")),
+              keywordTarget: emptyToUndefined(formData.get("keywordTarget")),
               sort: emptyToUndefined(formData.get("sort")),
               page: 1,
             }),
@@ -250,28 +303,128 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
                 spellCheck={false}
               />
             </label>
+            <FilterSelect
+              name="regulatoryClass"
+              label={t("regulatoryClass")}
+              value={search.regulatoryClass}
+              options={regulatoryClasses}
+            />
+            <FilterSelect
+              name="route"
+              label={t("routeOfAdministration")}
+              value={search.route}
+              options={routeOfAdministration}
+            />
+            <label className="field compact">
+              <span>{t("seriousAdverseReactions")}</span>
+              <input
+                className="input"
+                autoComplete="off"
+                defaultValue={search.adverseReactionKeyword ?? ""}
+                name="adverseReactionKeyword"
+              />
+            </label>
+            <FilterSelect
+              name="precautionCategory"
+              label={t("precautionsForSpecificPopulations")}
+              value={search.precautionCategory}
+              options={precautionCategories}
+            />
           </>
         ) : (
-          <label className="field compact">
-            <span>{t("icd10Chapter")}</span>
-            <select className="input" name="icd10Chapter" defaultValue={search.icd10Chapter ?? ""}>
-              <option value="">{t("all")}</option>
-              {icd10Chapters.map((option) => (
-                <option key={option} value={option}>
-                  {formatOption(option)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <>
+            <FilterSelect
+              name="icd10Chapter"
+              label={t("icd10Chapter")}
+              value={search.icd10Chapter}
+              options={icd10Chapters}
+            />
+            <FilterSelect
+              name="department"
+              label={t("medicalDepartment")}
+              value={search.department}
+              options={medicalDepartments}
+            />
+            <FilterSelect
+              name="chronicity"
+              label={t("chronicity")}
+              value={search.chronicity}
+              options={chronicities}
+            />
+            <FilterSelect
+              name="infectious"
+              label={t("infectious")}
+              value={search.infectious}
+              options={["true", "false"]}
+            />
+            <label className="field compact">
+              <span>{t("symptoms")}</span>
+              <input
+                className="input"
+                autoComplete="off"
+                defaultValue={search.symptomKeyword ?? ""}
+                name="symptomKeyword"
+              />
+            </label>
+            <FilterSelect
+              name="onsetPattern"
+              label={t("onsetPattern")}
+              value={search.onsetPattern}
+              options={onsetPatternOptions}
+            />
+            <FilterSelect
+              name="examCategory"
+              label={t("examCategory")}
+              value={search.examCategory}
+              options={examCategoryOptions}
+            />
+            <FilterSelect
+              name="hasPharmacologicalTreatment"
+              label={t("pharmacologicalTreatments")}
+              value={search.hasPharmacologicalTreatment}
+              options={["true", "false"]}
+            />
+            <FilterSelect
+              name="hasSeverityGrading"
+              label={t("severityGrading")}
+              value={search.hasSeverityGrading}
+              options={["true", "false"]}
+            />
+          </>
         )}
+        <FilterSelect
+          name="keywordMatch"
+          label={t("keywordMatch")}
+          value={search.keywordMatch}
+          options={["partial", "prefix"]}
+        />
+        <FilterSelect
+          name="keywordTarget"
+          label={t("keywordTarget")}
+          value={search.keywordTarget}
+          options={
+            kind === "drugs"
+              ? ["generic", "brand", "both", "all"]
+              : ["name", "name_english", "synonyms", "all"]
+          }
+        />
         <label className="field compact">
           <span>{t("sort")}</span>
           <select className="input" name="sort" defaultValue={search.sort ?? ""}>
             <option value="">{t("sortDefault")}</option>
-            <option value={kind === "drugs" ? "brandName" : "name"}>
-              {kind === "drugs" ? t("sortBrandName") : t("sortName")}
-            </option>
-            <option value="updatedAt">{t("sortUpdatedAt")}</option>
+            <option value="-revised_at">{t("sortUpdatedAt")}</option>
+            {kind === "drugs" ? (
+              <>
+                <option value="brand_name_kana">{t("sortBrandName")}</option>
+                <option value="atc_code">{t("atcCode")}</option>
+                <option value="therapeutic_category_name">{t("therapeuticCategoryName")}</option>
+              </>
+            ) : (
+              <>
+                <option value="name_kana">{t("sortName")}</option>
+                <option value="icd10_chapter">{t("icd10Chapter")}</option>
+              </>
+            )}
           </select>
         </label>
         <button className="button button-secondary" type="submit">
@@ -307,7 +460,6 @@ function ResourceList({ kind }: { kind: ResourceKind }) {
                 })
               }
             />
-            <ResourceSwitcher />
           </div>
           <div className="table-wrap data-panel">
             <table>
@@ -426,6 +578,32 @@ function ResourceSwitcher() {
 function emptyToUndefined(value: FormDataEntryValue | null): string | undefined {
   const text = String(value ?? "");
   return text === "" ? undefined : text;
+}
+
+function FilterSelect({
+  name,
+  label,
+  value,
+  options,
+}: {
+  name: string;
+  label: string;
+  value?: string;
+  options: readonly string[];
+}) {
+  return (
+    <label className="field compact">
+      <span>{label}</span>
+      <select className="input" name={name} defaultValue={value ?? ""}>
+        <option value="">{t("all")}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {formatOption(option)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 function ResourceThumbnail({ item }: { item: unknown }) {
@@ -812,13 +990,13 @@ function structuredText(value: unknown): string {
   if (typeof value === "object") {
     return Object.entries(value as Record<string, unknown>)
       .filter(([, child]) => child !== undefined && child !== null && child !== "")
-      .map(([key, child]) => `${key}: ${structuredText(child)}`)
+      .map(([key, child]) => `${formatMessageKey(key)}: ${structuredText(child)}`)
       .join("\n");
   }
   if (typeof value === "boolean") {
     return value ? t("yes") : t("no");
   }
-  return String(value);
+  return formatOption(String(value));
 }
 
 function ResourceEditor({ kind }: { kind: ResourceKind }) {

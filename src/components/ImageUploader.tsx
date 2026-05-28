@@ -14,9 +14,10 @@ type ImageUploaderProps = {
 
 export function ImageUploader({ drugId, imageUrl }: ImageUploaderProps) {
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
   const upload = useUploadDrugImage(drugId);
-  const resolvedImageUrl = resolveApiUrl(previewUrl ?? imageUrl);
+  const resolvedImageUrl = resolveApiUrl(uploadedImageUrl ?? previewUrl ?? imageUrl);
 
   return (
     <section className="section-panel" aria-labelledby="image-upload-title">
@@ -54,9 +55,16 @@ export function ImageUploader({ drugId, imageUrl }: ImageUploaderProps) {
             if (previewUrl !== undefined) {
               URL.revokeObjectURL(previewUrl);
             }
-            setPreviewUrl(URL.createObjectURL(file));
+            const objectUrl = URL.createObjectURL(file);
+            setPreviewUrl(objectUrl);
+            setUploadedImageUrl(undefined);
             upload.mutate(file, {
-              onSuccess: () => setMessage(t("uploaded")),
+              onSuccess: (data) => {
+                URL.revokeObjectURL(objectUrl);
+                setPreviewUrl(undefined);
+                setUploadedImageUrl(data.imageUrl);
+                setMessage(t("uploaded"));
+              },
               onError: (error) =>
                 setMessage(error instanceof Error ? error.message : t("networkError")),
             });
