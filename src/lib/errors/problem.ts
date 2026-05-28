@@ -22,7 +22,11 @@ const problemSchema = z
   .passthrough();
 
 export function toFormPath(field: string): string {
-  return field.replace(/\[(\d+)\]/g, ".$1");
+  return field
+    .replace(/\[(\d+)\]/g, ".$1")
+    .split(".")
+    .map((segment) => segment.replace(/_([a-z0-9])/g, (_, char: string) => char.toUpperCase()))
+    .join(".");
 }
 
 export function problemToAppError(problem: ProblemDetails): AppError {
