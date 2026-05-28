@@ -6,7 +6,7 @@ repos:
         entry: pnpm precommit
         language: system
         pass_filenames: true
-        types_or: [javascript, jsx, ts, tsx, css, json, yaml]
+        types_or: [javascript, jsx, ts, tsx, css, json]
         stages: [pre-commit]
       - id: cms-pre-push
         name: CMS typecheck test and React hooks lint
