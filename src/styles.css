@@ -1,0 +1,351 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+:root {
+  color-scheme: light;
+  --background: oklch(0.985 0.004 100);
+  --foreground: oklch(0.22 0.018 260);
+  --muted: oklch(0.94 0.01 240);
+  --muted-foreground: oklch(0.45 0.025 255);
+  --border: oklch(0.84 0.015 240);
+  --primary: oklch(0.46 0.14 160);
+  --primary-foreground: oklch(0.99 0.004 100);
+  --danger: oklch(0.55 0.19 25);
+  --danger-foreground: oklch(0.99 0.004 100);
+  --warning: oklch(0.9 0.08 85);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid oklch(0.65 0.16 200);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: oklch(0.96 0.008 210);
+  padding: 24px;
+}
+
+.eyebrow,
+.breadcrumb,
+.muted,
+.field-hint {
+  color: var(--muted-foreground);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.brand {
+  display: block;
+  color: var(--foreground);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.nav-link {
+  display: block;
+  margin-top: 16px;
+  border-radius: 6px;
+  color: var(--foreground);
+  padding: 10px 12px;
+  text-decoration: none;
+}
+
+.nav-link.active,
+.nav-link:hover {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.main-pane {
+  min-width: 0;
+  padding: 28px;
+}
+
+.page-stack,
+.form-grid,
+.stack {
+  display: grid;
+  gap: 20px;
+}
+
+.page-header,
+.toolbar,
+.button-row,
+.array-row {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.page-header {
+  justify-content: space-between;
+}
+
+.page-header h1 {
+  margin: 4px 0 0;
+  font-size: 1.8rem;
+  line-height: 1.2;
+}
+
+.breadcrumb {
+  margin: 0;
+}
+
+.section-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: oklch(0.995 0.002 100);
+  padding: 18px;
+}
+
+.section-panel h2 {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+}
+
+.field-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field,
+.field-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-wide {
+  grid-column: 1 / -1;
+}
+
+.compact {
+  max-width: 360px;
+}
+
+.input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  padding: 9px 10px;
+}
+
+.textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.multi {
+  min-height: 120px;
+}
+
+.monospace,
+.json-view {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.checkbox-field {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.button,
+.icon-button,
+.file-input {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.button-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.button-secondary {
+  background: white;
+  color: var(--foreground);
+}
+
+.button-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--danger-foreground);
+}
+
+.icon-button {
+  width: 38px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.text-link {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.json-view {
+  max-height: 520px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.notice {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--warning);
+  padding: 10px 12px;
+}
+
+.notice-error {
+  border-color: var(--danger);
+  background: oklch(0.95 0.04 25);
+}
+
+.success {
+  color: oklch(0.42 0.13 155);
+  font-weight: 700;
+}
+
+.sticky-actions {
+  position: sticky;
+  bottom: 0;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background), transparent 10%);
+  padding: 12px 0;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 42%);
+  padding: 24px;
+}
+
+.dialog {
+  width: min(480px, 100%);
+  border-radius: 8px;
+  background: white;
+  padding: 20px;
+}
+
+.resource-image {
+  display: block;
+  width: 180px;
+  height: 180px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.file-input input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-header,
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+}

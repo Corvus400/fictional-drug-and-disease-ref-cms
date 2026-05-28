@@ -1,0 +1,16 @@
+repos:
+  - repo: local
+    hooks:
+      - id: cms-biome-check
+        name: CMS Biome check
+        entry: pnpm precommit
+        language: system
+        pass_filenames: true
+        types_or: [javascript, jsx, ts, tsx, css, json, yaml]
+        stages: [pre-commit]
+      - id: cms-pre-push
+        name: CMS typecheck test and React hooks lint
+        entry: pnpm prepush
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
