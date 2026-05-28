@@ -1,0 +1,44 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Asia/Tokyo",
+  "schedule": ["before 1am on sunday"],
+  "rebaseWhen": "never",
+  "dependencyDashboard": true,
+  "enabledManagers": ["npm", "github-actions"],
+  "labels": ["dependencies", "renovate"],
+  "assignees": ["Corvus400"],
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["react", "react-dom"],
+      "groupName": "React"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["/^@tanstack\\//"],
+      "groupName": "TanStack"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["/^@radix-ui\\//"],
+      "groupName": "Radix"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "/^@biomejs\\//",
+        "eslint",
+        "typescript-eslint",
+        "vitest",
+        "@playwright/test",
+        "/^@testing-library\\//"
+      ],
+      "groupName": "Lint and test tooling"
+    }
+  ],
+  "prBodyDefinitions": {
+    "Source": "{{#if sourceUrl}}[{{{sourceUrl}}}]({{{sourceUrl}}}){{else}}—{{/if}}"
+  },
+  "prBodyColumns": ["Package", "Change", "Age", "Confidence", "Source"]
+}
